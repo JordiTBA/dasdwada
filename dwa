@@ -1,3 +1,4 @@
+--"a"
 local InputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -61,8 +62,8 @@ function Utility:MakeDraggable(frame, dragHandle)
         local delta = input.Position - dragStart
         local targetPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         
-        -- Add smooth drag here if needed, for now using direct update for responsiveness
-        Utility:Tween(frame, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = targetPos})
+        -- Direct update for performance (Tweening every frame is heavy)
+        frame.Position = targetPos
     end
 
     dragHandle.InputBegan:Connect(function(input)
@@ -871,10 +872,13 @@ function Library:CreateWindow(options)
                             end
                         end
                         
+                        -- Direct property update instead of Tween for bulk updates
                         if isSelected then
-                            Utility:Tween(btn, TweenInfo.new(0.2), {BackgroundColor3 = Library.Theme.Accent, TextColor3 = Library.Theme.Main})
+                            btn.BackgroundColor3 = Library.Theme.Accent
+                            btn.TextColor3 = Library.Theme.Main
                         else
-                            Utility:Tween(btn, TweenInfo.new(0.2), {BackgroundColor3 = Library.Theme.Main, TextColor3 = Library.Theme.TextDark})
+                            btn.BackgroundColor3 = Library.Theme.Main
+                            btn.TextColor3 = Library.Theme.TextDark
                         end
                     end
                 end
@@ -922,8 +926,13 @@ function Library:CreateWindow(options)
                 end
 
                 if Search then
+                    local lastSearch = 0
                     SearchBar:GetPropertyChangedSignal("Text"):Connect(function()
-                        FilterItems(SearchBar.Text)
+                        local now = tick()
+                        if now - lastSearch > 0.1 then -- Simple debounce
+                            lastSearch = now
+                            FilterItems(SearchBar.Text)
+                        end
                     end)
                 end
 
