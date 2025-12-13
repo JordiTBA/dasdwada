@@ -1,3 +1,4 @@
+--xx
 local InputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -779,27 +780,6 @@ function Library:CreateWindow(options)
                 DropdownButton.Size = UDim2.new(1, 0, 0, 32)
                 DropdownButton.Text = ""
 
-                local SearchBar = Instance.new("TextBox")
-                if Search then
-                    SearchBar.Name = "SearchBar"
-                    SearchBar.Parent = DropdownFrame
-                    SearchBar.BackgroundColor3 = Library.Theme.Secondary
-                    SearchBar.BorderSizePixel = 0
-                    SearchBar.Position = UDim2.new(0, 5, 0, 35)
-                    SearchBar.Size = UDim2.new(1, -10, 0, 25)
-                    SearchBar.Font = Enum.Font.Gotham
-                    SearchBar.PlaceholderText = "Search..."
-                    SearchBar.Text = ""
-                    SearchBar.TextColor3 = Library.Theme.Text
-                    SearchBar.PlaceholderColor3 = Library.Theme.TextDark
-                    SearchBar.TextSize = 13
-                    SearchBar.Visible = false
-                    
-                    local SearchCorner = Instance.new("UICorner")
-                    SearchCorner.CornerRadius = UDim.new(0, 4)
-                    SearchCorner.Parent = SearchBar
-                end
-
                 local ItemContainer = Instance.new("ScrollingFrame")
                 ItemContainer.Parent = DropdownFrame
                 ItemContainer.Active = true
@@ -834,16 +814,10 @@ function Library:CreateWindow(options)
                     Open = not Open
                     local itemCount = #Items
                     local contentHeight = math.min(itemCount * 25, 150)
-                    local searchHeight = Search and 30 or 0
                     
-                    if Search then
-                        SearchBar.Visible = Open
-                        ItemContainer.Position = UDim2.new(0, 5, 0, 35 + searchHeight)
-                    else
-                        ItemContainer.Position = UDim2.new(0, 5, 0, 35)
-                    end
+                    ItemContainer.Position = UDim2.new(0, 5, 0, 35)
 
-                    Utility:Tween(DropdownFrame, TweenInfo.new(0.2), {Size = Open and UDim2.new(1, 0, 0, contentHeight + 40 + searchHeight) or UDim2.new(1, 0, 0, 32)})
+                    Utility:Tween(DropdownFrame, TweenInfo.new(0.2), {Size = Open and UDim2.new(1, 0, 0, contentHeight + 40) or UDim2.new(1, 0, 0, 32)})
                     Utility:Tween(Arrow, TweenInfo.new(0.2), {Rotation = Open and 180 or 0})
                     
                     ItemContainer.Visible = Open
@@ -925,12 +899,54 @@ function Library:CreateWindow(options)
                 end
 
                 if Search then
+                    local SearchFrame = Instance.new("Frame")
+                    SearchFrame.Name = Name .. "Search"
+                    SearchFrame.Parent = Container
+                    SearchFrame.BackgroundColor3 = Library.Theme.Main
+                    SearchFrame.Size = UDim2.new(1, 0, 0, 32)
+                    
+                    -- Reorder to put search above dropdown
+                    DropdownFrame.Parent = nil
+                    DropdownFrame.Parent = Container
+
+                    local SearchCorner = Instance.new("UICorner")
+                    SearchCorner.CornerRadius = UDim.new(0, 4)
+                    SearchCorner.Parent = SearchFrame
+                    
+                    local SearchStroke = Instance.new("UIStroke")
+                    SearchStroke.Color = Library.Theme.Stroke
+                    SearchStroke.Thickness = 1
+                    SearchStroke.Parent = SearchFrame
+                    
+                    local SearchLabel = Instance.new("TextLabel")
+                    SearchLabel.Parent = SearchFrame
+                    SearchLabel.BackgroundTransparency = 1
+                    SearchLabel.Position = UDim2.new(0, 10, 0, 0)
+                    SearchLabel.Size = UDim2.new(0, 100, 1, 0)
+                    SearchLabel.Font = Enum.Font.Gotham
+                    SearchLabel.Text = "Search"
+                    SearchLabel.TextColor3 = Library.Theme.Text
+                    SearchLabel.TextSize = 14
+                    SearchLabel.TextXAlignment = Enum.TextXAlignment.Left
+                    
+                    local SearchBox = Instance.new("TextBox")
+                    SearchBox.Parent = SearchFrame
+                    SearchBox.BackgroundTransparency = 1
+                    SearchBox.Position = UDim2.new(0, 110, 0, 0)
+                    SearchBox.Size = UDim2.new(1, -120, 1, 0)
+                    SearchBox.Font = Enum.Font.Gotham
+                    SearchBox.PlaceholderText = "Type to filter..."
+                    SearchBox.Text = ""
+                    SearchBox.TextColor3 = Library.Theme.Accent
+                    SearchBox.TextSize = 14
+                    SearchBox.TextXAlignment = Enum.TextXAlignment.Right
+
                     local lastSearch = 0
-                    SearchBar:GetPropertyChangedSignal("Text"):Connect(function()
+                    SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
                         local now = tick()
                         if now - lastSearch > 0.1 then -- Simple debounce
                             lastSearch = now
-                            FilterItems(SearchBar.Text)
+                            FilterItems(SearchBox.Text)
                         end
                     end)
                 end
