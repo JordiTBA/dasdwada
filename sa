@@ -263,7 +263,7 @@ local function refreshPetData()
             level = lvlAttr or (lvlMatch and tonumber(lvlMatch)) or 1
         elseif type(petData) == "table" then
             uuid = petData.UUID or "NoUUID"
-            full = petData.Name or (petData.PetData and petData.PetData.Name) or "Unnamed"
+            full = petData.Name or (petData.PetData and petData.PetType) or "Unnamed"
             level = petData.PetData and petData.PetData.Level or 1
         end
 
@@ -626,6 +626,7 @@ local function CreateDropdowns()
             Items = list,
             CurrentValue = {},
             Multi = true,
+            Search = true,
             Flag = "PetDropdown",
             Callback = function(Option)
                 selectedPets = Option
