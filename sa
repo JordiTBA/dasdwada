@@ -1,4 +1,4 @@
---
+--xaz
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/JordiTBA/dasdwada/refs/heads/main/dwa"))()
 local Window = Library:CreateWindow({
     Title = "Jordi Hub",
