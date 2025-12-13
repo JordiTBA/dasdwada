@@ -1,4 +1,3 @@
---xx
 local InputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -898,6 +897,8 @@ function Library:CreateWindow(options)
                     ItemContainer.CanvasSize = UDim2.new(0, 0, 0, visibleCount * 25)
                 end
 
+                local SearchBox -- Define SearchBox in outer scope
+
                 if Search then
                     local SearchFrame = Instance.new("Frame")
                     SearchFrame.Name = Name .. "Search"
@@ -929,7 +930,7 @@ function Library:CreateWindow(options)
                     SearchLabel.TextSize = 14
                     SearchLabel.TextXAlignment = Enum.TextXAlignment.Left
                     
-                    local SearchBox = Instance.new("TextBox")
+                    SearchBox = Instance.new("TextBox") -- Assign to outer variable
                     SearchBox.Parent = SearchFrame
                     SearchBox.BackgroundTransparency = 1
                     SearchBox.Position = UDim2.new(0, 110, 0, 0)
@@ -979,7 +980,7 @@ function Library:CreateWindow(options)
                         table.insert(Buttons, {Button = ItemButton, Item = item})
                     end
                     UpdateButtons()
-                    if Search then FilterItems(SearchBar.Text) end
+                    if Search and SearchBox then FilterItems(SearchBox.Text) end
                 end
 
                 CreateItemButtons()
