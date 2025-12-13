@@ -291,7 +291,7 @@ function Library:CreateWindow(options)
     
     -- Destroy - Using X Icon
     local isPrompting = false
-    CreateControl("Close", "rbxassetid://3926305904", function()
+    CreateControl("Close", "rbxassetid://6031094678", function()
         if isPrompting then return end
         isPrompting = true
         Library:Prompt({
