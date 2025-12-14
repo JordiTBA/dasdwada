@@ -1,4 +1,4 @@
---
+--xx
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/JordiTBA/dasdwada/refs/heads/main/dwa"))()
 local Window =
     Library:CreateWindow(
@@ -293,7 +293,7 @@ local function refreshPetData()
         local name = full:match("^(.-)%s*%[") or full
 
         local displayString = ""
-        displayString = string.format("%s{%s} Level %s %s %.2f KG", status, like, level, name, weight)
+        displayString = string.format("%s[%s] Level %s %s %.2f KG", status, like, level, name, weight)
         getgenv().InventoryMap[displayString] = uuid
         table.insert(displayList, displayString)
     end
