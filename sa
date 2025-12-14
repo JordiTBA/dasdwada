@@ -1,10 +1,13 @@
---xaz
+--
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/JordiTBA/dasdwada/refs/heads/main/dwa"))()
-local Window = Library:CreateWindow({
-    Title = "Jordi Hub",
-    SubTitle = "Grow A Garden",
-    TabWidth = 160
-})
+local Window =
+    Library:CreateWindow(
+    {
+        Title = "Jordi Hub",
+        SubTitle = "Grow A Garden",
+        TabWidth = 160
+    }
+)
 
 task.spawn(
     function()
@@ -104,31 +107,33 @@ local LocalPlayer = Players.LocalPlayer
 
 local function sendToWebhook(levelInput, weightInput)
     local data = {
-        ["embeds"] = {{
-            ["title"] = "jordi Hub",
-            ["description"] = "Player Statistics Update",
-            ["color"] = 41727, -- Blue color
-            ["fields"] = {
-                {
-                    ["name"] = "Player",
-                    ["value"] = LocalPlayer.Name,
-                    ["inline"] = true
+        ["embeds"] = {
+            {
+                ["title"] = "jordi Hub",
+                ["description"] = "Player Statistics Update",
+                ["color"] = 41727, -- Blue color
+                ["fields"] = {
+                    {
+                        ["name"] = "Player",
+                        ["value"] = LocalPlayer.Name,
+                        ["inline"] = true
+                    },
+                    {
+                        ["name"] = "Level",
+                        ["value"] = tostring(levelInput),
+                        ["inline"] = true
+                    },
+                    {
+                        ["name"] = "Base Weight",
+                        ["value"] = tostring(weightInput),
+                        ["inline"] = true
+                    }
                 },
-                {
-                    ["name"] = "Level",
-                    ["value"] = tostring(levelInput),
-                    ["inline"] = true
-                },
-                {
-                    ["name"] = "Base Weight",
-                    ["value"] = tostring(weightInput),
-                    ["inline"] = true
+                ["footer"] = {
+                    ["text"] = "jordi Hub"
                 }
-            },
-            ["footer"] = {
-                ["text"] = "jordi Hub"
             }
-        }}
+        }
     }
 
     local headers = {
@@ -141,14 +146,19 @@ local function sendToWebhook(levelInput, weightInput)
         return
     end
 
-    local success, response = pcall(function()
-        return http_request({
-            Url = webhookUrl,
-            Method = "POST",
-            Headers = headers,
-            Body = HttpService:JSONEncode(data)
-        })
-    end)
+    local success, response =
+        pcall(
+        function()
+            return http_request(
+                {
+                    Url = webhookUrl,
+                    Method = "POST",
+                    Headers = headers,
+                    Body = HttpService:JSONEncode(data)
+                }
+            )
+        end
+    )
 
     if success then
         print("Embed sent to Discord webhook!")
@@ -247,7 +257,7 @@ end
 -- // Core Logic: Refresh Data // --
 local function refreshPetData()
     local displayList = {}
-    getgenv().InventoryMap = {}
+    getgenv().InventoryMap = getgenv().InventoryMap or {}
 
     local function addPetToList(petData, isEquipped)
         local uuid = "NoUUID"
@@ -301,6 +311,33 @@ local function refreshPetData()
     end
 
     return displayList
+end
+
+local function GetUpdatedSelection(currentSelection)
+    local newSelection = {}
+    -- 1. Capture UUIDs of currently selected pets
+    local selectedUUIDs = {}
+    if type(currentSelection) == "table" then
+        for _, displayStr in ipairs(currentSelection) do
+            local uuid = getgenv().InventoryMap[displayStr]
+            if uuid then
+                selectedUUIDs[uuid] = true
+            end
+        end
+    end
+
+    -- 2. Refresh Data (this updates InventoryMap with new strings)
+    local allNewItems = refreshPetData()
+
+    -- 3. Find new strings that match the UUIDs
+    for _, displayStr in ipairs(allNewItems) do
+        local uuid = getgenv().InventoryMap[displayStr]
+        if uuid and selectedUUIDs[uuid] then
+            table.insert(newSelection, displayStr)
+        end
+    end
+
+    return allNewItems, newSelection
 end
 
 local function check_pet_active(uuid)
@@ -376,6 +413,29 @@ local function get_total_equipped_pets()
     end
     return 0
 end
+local function Unequip_all_pet()
+    local success, myActivePets =
+        pcall(
+        function()
+            return PetUtilities:GetPetsSortedByAge(LocalPlayer, 0, false, true)
+        end
+    )
+    local make_sure = true
+    while make_sure do
+        make_sure = false
+        for index, value in ipairs(myActivePets) do
+            for _, pet in pairs(selectedPets) do
+                local uuid = getgenv().InventoryMap[pet]
+                if PetsService and value.UUID == uuid and check_pet_active(uuid) then
+                    PetsService:UnequipPet(uuid)
+                    task.wait(0.5)
+                    make_sure = true
+                end
+            end
+        end
+        task.wait(1)
+    end
+end
 
 local function start_leveling()
     task.spawn(
@@ -409,7 +469,7 @@ local function start_leveling()
                     print("Current Mode:", getgenv().Mode)
                     print("Selected Pets:", #selectedPets)
                     print("Weight Target:", weight_to_remove)
-                    print(table.concat(selectedPets, ", ").."anjing")
+                    print(table.concat(selectedPets, ", ") .. "anjing")
                     if getgenv().Mode == "leveling" then
                         while check_loadout() ~= 1 do
                             Library:Notify(
@@ -467,24 +527,14 @@ local function start_leveling()
                                 -- Unequip Active Pets (Only chosen ones)
                                 local make_sure = false
                                 while not make_sure do
-                                    local check = false
                                     for index, value in ipairs(myActivePets) do
                                         for _, pet in pairs(selectedPets) do
                                             local uuid = getgenv().InventoryMap[pet]
-                                            if PetsService and value.UUID == uuid then
-                                                check = true
+                                            if PetsService and value.UUID == uuid and check_pet_active(uuid) then
                                                 PetsService:UnequipPet(uuid)
-                                            task.wait(0.5)
-
+                                                task.wait(0.5)
                                             end
                                         end
-                                    end
-                                    if check then
-                                        getgenv().Mode = "reseting"
-                                        task.wait(0.5)
-
-                                        make_sure = true
-                                        break
                                     end
                                     task.wait(1)
                                 end
@@ -547,7 +597,6 @@ local function start_leveling()
                                                     Duration = 4
                                                 }
                                             )
-
                                         end
                                         if lvl > 2 then
                                             print("Pet not reset:", uuid, lvl)
@@ -565,26 +614,16 @@ local function start_leveling()
                                 )
                                 getgenv().Mode = "leveling"
 
-                                local make_sure = false
-                                while not make_sure do
-                                    local check = false
+                                local make_sure = true
+                                while make_sure do
                                     for index, value in ipairs(myActivePets) do
                                         for _, pet in pairs(selectedPets) do
                                             local uuid = getgenv().InventoryMap[pet]
-                                            if PetsService and value.UUID == uuid then
-                                                check = true
+                                            if PetsService and value.UUID == uuid and check_pet_active(uuid) then
                                                 PetsService:UnequipPet(uuid)
-                                            task.wait(0.5)
-
+                                                task.wait(0.5)
                                             end
                                         end
-                                    end
-                                    if check then
-                                        getgenv().Mode = "leveling"
-                                        task.wait(0.5)
-
-                                        make_sure = true
-                                        break
                                     end
                                     task.wait(1)
                                 end
@@ -643,50 +682,64 @@ MainSection:CreateButton(
     {
         Name = "Refresh Lists",
         Callback = function()
-            local newList = refreshPetData()
-            PetDropdown:Refresh(newList, true) -- Note: ui.lua Dropdown doesn't have Refresh method yet! I need to check ui.lua
-            -- Removed BlacklistDropdown:Refresh call
+            local newList, newSelection = GetUpdatedSelection(selectedPets)
+            selectedPets = newSelection
+            PetDropdown:Refresh(newList, newSelection)
         end
     }
 )
 
 local ConfigSection = Tab:CreateSection("Configuration")
 
-ConfigSection:CreateInput({
-    Name = "Config Name",
-    Placeholder = "default",
-    Flag = "ConfigName",
-    Callback = function(Text)
-        getgenv().ConfigName = Text
-    end
-})
+ConfigSection:CreateInput(
+    {
+        Name = "Config Name",
+        Placeholder = "default",
+        Flag = "ConfigName",
+        Callback = function(Text)
+            getgenv().ConfigName = Text
+        end
+    }
+)
 
-ConfigSection:CreateButton({
-    Name = "Save Config",
-    Callback = function()
-        local name = getgenv().ConfigName or "default"
-        Library:SaveConfig(name)
-    end
-})
+ConfigSection:CreateButton(
+    {
+        Name = "Save Config",
+        Callback = function()
+            local name = getgenv().ConfigName or "default"
+            Library:SaveConfig(name)
+        end
+    }
+)
 
-ConfigSection:CreateButton({
-    Name = "Load Config",
-    Callback = function()
-        local name = getgenv().ConfigName or "default"
-        Library:LoadConfig(name)
-    end
-})
+ConfigSection:CreateButton(
+    {
+        Name = "Load Config",
+        Callback = function()
+            -- Refresh data before loading to ensure map is current
+            local newList = refreshPetData()
+            if PetDropdown then
+                PetDropdown:Refresh(newList, true)
+            end
+
+            local name = getgenv().ConfigName or "default"
+            Library:LoadConfig(name)
+        end
+    }
+)
 
 local AutomationSection = Tab:CreateSection("Automation Settings")
 
-AutomationSection:CreateInput({
-   Name = "Webhook URL",
-   Placeholder = "Enter Discord Webhook URL",
-   Flag = "WebhookUrl",
-   Callback = function(Text)
-      getgenv().webhookUrl = Text
-   end,
-})
+AutomationSection:CreateInput(
+    {
+        Name = "Webhook URL",
+        Placeholder = "Enter Discord Webhook URL",
+        Flag = "WebhookUrl",
+        Callback = function(Text)
+            getgenv().webhookUrl = Text
+        end
+    }
+)
 
 AutomationSection:CreateInput(
     {
@@ -801,8 +854,33 @@ BackupSection:CreateButton(
     {
         Name = "Refresh Backup List",
         Callback = function()
-            local newList = get_unselected_pets()
-            BackupDropdown:Refresh(newList, true)
+            local newList, newSelection = GetUpdatedSelection(getgenv().BackupPets)
+            getgenv().BackupPets = newSelection
+
+            local unselected = {}
+            local selected_lookup = {}
+            for _, v in pairs(selectedPets) do
+                selected_lookup[v] = true
+            end
+
+            for _, pet_string in pairs(newList) do
+                if not selected_lookup[pet_string] then
+                    table.insert(unselected, pet_string)
+                end
+            end
+
+            local validBackupSelection = {}
+            for _, v in pairs(newSelection) do
+                if not selected_lookup[v] then
+                    table.insert(validBackupSelection, v)
+                end
+            end
+            getgenv().BackupPets = validBackupSelection
+
+            if #unselected == 0 then
+                unselected = {"No available backup pets"}
+            end
+            BackupDropdown:Refresh(unselected, validBackupSelection)
         end
     }
 )
@@ -834,6 +912,7 @@ ToyPetsDropdown =
         Items = {"Click Refresh to Load"},
         CurrentValue = {},
         Multi = true,
+        Search = true,
         Flag = "ToyPetsDropdown",
         Callback = function(Option)
             selectedToyPets = Option
@@ -842,150 +921,131 @@ ToyPetsDropdown =
     }
 )
 
-
-
 ToySection:CreateButton(
     {
         Name = "Refresh Active Pets",
         Callback = function()
-            local newList = refreshPetData()
-            ToyPetsDropdown:Refresh(newList, true)
+            local newList, newSelection = GetUpdatedSelection(selectedToyPets)
+            selectedToyPets = newSelection
+            ToyPetsDropdown:Refresh(newList, newSelection)
         end
     }
 )
 
-ToySection:CreateToggle({
-    Name = "Use Toy",
-    CurrentValue = false,
-    Flag = "UseToyToggle",
-    Callback = function(Value)
-        getgenv().use_toy = Value
-        
-        -- 1. Check if pets are selected
-        if Value and #selectedToyPets == 0 then
-            Library:Notify({
-                Title = "Pet Toy",
-                Content = "No pets selected!",
-                Duration = 3
-            })
-            getgenv().use_toy = false
-            return
-        end
-        
-        if not Value then
-            Library:Notify({
-                Title = "Pet Toy",
-                Content = "Toy usage stopped.",
-                Duration = 3
-            })
-            return
-        end
+ToySection:CreateToggle(
+    {
+        Name = "Use Toy",
+        CurrentValue = false,
+        Flag = "UseToyToggle",
+        Callback = function(Value)
+            getgenv().use_toy = Value
 
-
-        local toyNamesString = ""
-        if type(selectedToySize) == "table" then
-            toyNamesString = table.concat(selectedToySize, ", ")
-        else
-            toyNamesString = tostring(selectedToySize)
-        end
-
-        Library:Notify({
-            Title = "Pet Toy",
-            Content = string.format(
-                "Using [%s] on %d pets", 
-                toyNamesString,       -- Fixed variable
-                #selectedToyPets
-                
-            ),
-            Duration = 3
-        })
-
-        -- 4. Start the loop
-        if getgenv().use_toy then
-            task.spawn(function()
-                while getgenv().use_toy do
-                    local success, myActivePets = pcall(function()
-                    return PetUtilities:GetPetsSortedByAge(LocalPlayer, 0, false, true)
-                end)
-
-local boost_amounts = {
-    ["Small"] = 0.1,
-    ["Medium"] = 0.2,
-    ["Large"] = 0.3,
-    -- Tambahkan mapping untuk nama lengkap jika perlu
-    ["Small Pet Toy"] = 0.1,
-    ["Medium Pet Toy"] = 0.2,
-    ["Large Pet Toy"] = 0.3
-}
-if success and myActivePets then
-    for _, pet_id in ipairs(selectedToyPets) do
-        local uuid = getgenv().InventoryMap and getgenv().InventoryMap[pet_id]
-        if uuid and check_pet_active(uuid) then
-            local currentPetData = nil
-            for _, pet in pairs(myActivePets) do
-                if pet.UUID == uuid then
-                    currentPetData = pet
-                    break
-                end
+            -- 1. Check if pets are selected
+            if Value and #selectedToyPets == 0 then
+                Library:Notify(
+                    {
+                        Title = "Pet Toy",
+                        Content = "No pets selected!",
+                        Duration = 3
+                    }
+                )
+                getgenv().use_toy = false
+                return
             end
-            if currentPetData then
-                local active_boosts = {}
-                if currentPetData.PetData and currentPetData.PetData.Boosts then
-                    for _, boost in pairs(currentPetData.PetData.Boosts) do
-                        active_boosts[boost.BoostAmount] = true
-                    end
-                end
-                for _, toyName in pairs(selectedToySize) do
-                    local requiredAmount = boost_amounts[toyName]
-                    if requiredAmount and not active_boosts[requiredAmount] then
-                        print("Menggunakan " .. toyName .. " untuk Pet ID: " .. pet_id)
-                        local equip = EquipTool(toyName)
-                        if equip then
-                            Library:Notify({
-                                Title = "Pet Toy",
-                                Content = "Using " .. toyName .. " on pet " .. pet_id,
-                                Duration = 2
-                            })
-                            use_toy(uuid)
-                            task.wait(0.5) 
-                        else
-                            print("Failed to equip toy:", toyName)
+
+            if not Value then
+                Library:Notify(
+                    {
+                        Title = "Pet Toy",
+                        Content = "Toy usage stopped.",
+                        Duration = 3
+                    }
+                )
+                return
+            end
+
+            local toyNamesString = ""
+            if type(selectedToySize) == "table" then
+                toyNamesString = table.concat(selectedToySize, ", ")
+            else
+                toyNamesString = tostring(selectedToySize)
+            end
+
+            Library:Notify(
+                {
+                    Title = "Pet Toy",
+                    Content = string.format(
+                        "Using [%s] on %d pets",
+                        toyNamesString, 
+                        #selectedToyPets
+                    ),
+                    Duration = 3
+                }
+            )
+
+            if getgenv().use_toy then
+                task.spawn(
+                    function()
+                        while getgenv().use_toy do
+                            local success, myActivePets =
+                                pcall(
+                                function()
+                                    return PetUtilities:GetPetsSortedByAge(LocalPlayer, 0, false, true)
+                                end
+                            )
+
+                            local boost_amounts = {
+                                ["Small Pet Toy"] = 0.1,
+                                ["Medium Pet Toy"] = 0.2,
+                                ["Large Pet Toy"] = 0.3
+                            }
+                            if success and myActivePets then
+                                for _, pet_id in ipairs(selectedToyPets) do
+                                    local uuid = getgenv().InventoryMap and getgenv().InventoryMap[pet_id]
+                                    if uuid and check_pet_active(uuid) then
+                                        local currentPetData = nil
+                                        for _, pet in pairs(myActivePets) do
+                                            if pet.UUID == uuid then
+                                                currentPetData = pet
+                                                break
+                                            end
+                                        end
+                                        if currentPetData then
+                                            local active_boosts = {}
+                                            if currentPetData.PetData and currentPetData.PetData.Boosts then
+                                                for _, boost in pairs(currentPetData.PetData.Boosts) do
+                                                    active_boosts[boost.BoostAmount] = true
+                                                end
+                                            end
+                                            for _, toyName in pairs(selectedToySize) do
+                                                local requiredAmount = boost_amounts[toyName]
+                                                if requiredAmount and not active_boosts[requiredAmount] then
+                                                    print("Menggunakan " .. toyName .. " untuk Pet ID: " .. pet_id)
+                                                    local equip = EquipTool(toyName)
+                                                    if equip then
+                                                        Library:Notify(
+                                                            {
+                                                                Title = "Pet Toy",
+                                                                Content = "Using " .. toyName .. " on pet " .. pet_id,
+                                                                Duration = 2
+                                                            }
+                                                        )
+                                                        use_toy(uuid)
+                                                        task.wait(0.5)
+                                                    else
+                                                        print("Failed to equip toy:", toyName)
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                                task.wait(1)
+                            end
                         end
                     end
-                end
+                )
             end
         end
-    end
-    task.wait(1)
-end
-                    -- for _, pet_id in ipairs(selectedToyPets) do
-                    --     -- Iterate through the toy list
-                    --     for _, toy_name in pairs(selectedToySize) do
-                    --         local equip = EquipTool(toy_name)
-                            
-                    --         if equip then
-                    --             local uuid = getgenv().InventoryMap[pet_id]
-                                
-                    --             -- Check if UUID exists and pet is active
-                    --             if uuid and check_pet_active(uuid) then
-                    --                 Rayfield:Notify({
-                    --                     Title = "Pet Toy",
-                    --                     Content = "Using " .. toy_name .. " on pet " .. pet_id,
-                    --                     Duration = 2
-                    --                 })
-                                    
-                    --                 use_toy(uuid)
-                    --                 task.wait(0.5) -- Small delay between actions
-                    --             else
-                    --                 print("Pet invalid or inactive:", pet_id)
-                    --             end
-                    --         else
-                    --             print("Failed to equip toy:", toy_name)
-                    --         end
-                    --     end
-                    -- end
-                end
-            end)
-        end
-    end
-})
+    }
+)
