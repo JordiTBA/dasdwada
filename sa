@@ -1,4 +1,4 @@
---xx
+--
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/JordiTBA/dasdwada/refs/heads/main/dwa"))()
 local Window =
     Library:CreateWindow(
@@ -943,6 +943,29 @@ ToySection:CreateToggle(
                                 ["Large Pet Toy"] = 0.3
                             }
                             if success and myActivePets then
+                                -- Check Large Toy Condition from selectedPets
+                                local largeToyConditionMet = false
+                                local startW = getgenv().largeToyStart or 0
+                                local stopW = getgenv().largeToyStop or 100
+                                
+                                if getgenv().selectedPets then
+                                    for _, petName in pairs(getgenv().selectedPets) do
+                                        local uuid = getgenv().InventoryMap and getgenv().InventoryMap[petName]
+                                        if uuid then
+                                            for _, activePet in pairs(myActivePets) do
+                                                if activePet.UUID == uuid then
+                                                    local w = tonumber(calculate_weight(activePet, 1)) or 0
+                                                    if w >= startW and w < stopW then
+                                                        largeToyConditionMet = true
+                                                        break
+                                                    end
+                                                end
+                                            end
+                                        end
+                                        if largeToyConditionMet then break end
+                                    end
+                                end
+
                                 for _, pet_id in ipairs(getgenv().selectedToyPets) do
                                     local uuid = getgenv().InventoryMap and getgenv().InventoryMap[pet_id]
                                     if uuid and check_pet_active(uuid) then
@@ -965,12 +988,7 @@ ToySection:CreateToggle(
 
                                                 local canUse = true
                                                 if toyName == "Large Pet Toy" then
-                                                    local weightStr = calculate_weight(currentPetData, 1)
-                                                    local weight = tonumber(weightStr) or 0
-                                                    local startW = getgenv().largeToyStart or 0
-                                                    local stopW = getgenv().largeToyStop or 100
-
-                                                    if weight < startW or weight >= stopW then
+                                                    if not largeToyConditionMet then
                                                         canUse = false
                                                     end
                                                 end
