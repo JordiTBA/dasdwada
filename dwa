@@ -1,3 +1,4 @@
+--up
 local InputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -988,7 +989,11 @@ function Library:CreateWindow(options)
                 local Dropdown = {}
                 function Dropdown:Refresh(newItems, keepSelection)
                     Items = newItems
-                    if not keepSelection then
+                    if type(keepSelection) == "table" then
+                        Default = keepSelection
+                        Library.Flags[Flag] = Default
+                        UpdateText()
+                    elseif not keepSelection then
                         Default = Multi and {} or (Items[1] or "")
                         Library.Flags[Flag] = Default
                         UpdateText()
