@@ -1,4 +1,4 @@
---
+--xzxz
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/JordiTBA/dasdwada/refs/heads/main/dwa"))()
 local Window =
     Library:CreateWindow(
@@ -263,26 +263,30 @@ local function refreshPetData()
         local uuid = "NoUUID"
         local full = "Unnamed"
         local level = 1
+        local status = ""
 
+        local weight = 0.00
         if typeof(petData) == "Instance" then
             uuid = petData:GetAttribute("PET_UUID") or petData:GetAttribute("UUID") or "NoUUID"
             full = petData.Name
-
+            weight = full:match("%[([%d%.]+)%s*KG%]") or 0.00
             local lvlAttr = petData:GetAttribute("Level")
             local lvlMatch = full:match("Level%s*(%d+)") or full:match("Lvl%s*(%d+)") or full:match("Age%s*(%d+)")
-            level = lvlAttr or (lvlMatch and tonumber(lvlMatch)) or 1
+            level = lvlAttr or (lvlMatch and tonumber(lvlMatch)) or "Unknown"
+            status = "[Backpack]"
         elseif type(petData) == "table" then
             uuid = petData.UUID or "NoUUID"
             full = petData.Name or (petData.PetData and petData.PetType) or "Unnamed"
             level = petData.PetData and petData.PetData.Level or 1
+            weight = calculate_weight(petData) or 0
+            status = "[Equipped]"
         end
 
         local name = full:match("^(.-)%s*%[") or full
 
-        local status = ""
-        local shortUUID = tostring(uuid):sub(1, 6)
-        local displayString = string.format("%s{%s} Level %s %s", status, shortUUID, level, name)
-
+        local shortUUID = tostring(uuid):sub(2, 7)
+        local displayString = ""
+        displayString = string.format("%s{%s} Level %s %s %s %.2f KG", status, shortUUID, level, name, weight)
         getgenv().InventoryMap[displayString] = uuid
         table.insert(displayList, displayString)
     end
@@ -523,22 +527,7 @@ local function start_leveling()
                                         Duration = 3
                                     }
                                 )
-
-                                -- Unequip Active Pets (Only chosen ones)
-                                local make_sure = false
-                                while not make_sure do
-                                    for index, value in ipairs(myActivePets) do
-                                        for _, pet in pairs(selectedPets) do
-                                            local uuid = getgenv().InventoryMap[pet]
-                                            if PetsService and value.UUID == uuid and check_pet_active(uuid) then
-                                                PetsService:UnequipPet(uuid)
-                                                task.wait(0.5)
-                                            end
-                                        end
-                                    end
-                                    task.wait(1)
-                                end
-
+                                Unequip_all_pet()
                                 getgenv().Mode = "reseting"
                             end
                         end
@@ -613,20 +602,7 @@ local function start_leveling()
                                     {Title = "Auto Level", Content = "Pets Reset! Resuming...", Duration = 3}
                                 )
                                 getgenv().Mode = "leveling"
-
-                                local make_sure = true
-                                while make_sure do
-                                    for index, value in ipairs(myActivePets) do
-                                        for _, pet in pairs(selectedPets) do
-                                            local uuid = getgenv().InventoryMap[pet]
-                                            if PetsService and value.UUID == uuid and check_pet_active(uuid) then
-                                                PetsService:UnequipPet(uuid)
-                                                task.wait(0.5)
-                                            end
-                                        end
-                                    end
-                                    task.wait(1)
-                                end
+                                Unequip_all_pet()
                             end
                         end
                     end
@@ -812,27 +788,6 @@ local BackupSection = BackupTab:CreateSection("Backup")
 
 local BackupDropdown
 
-local function get_unselected_pets()
-    local all_pets = refreshPetData()
-    local unselected = {}
-
-    local selected_lookup = {}
-    for _, v in pairs(selectedPets) do
-        selected_lookup[v] = true
-    end
-
-    for _, pet_string in pairs(all_pets) do
-        if not selected_lookup[pet_string] then
-            table.insert(unselected, pet_string)
-        end
-    end
-
-    if #unselected == 0 then
-        return {"No available backup pets"}
-    end
-
-    return unselected
-end
 
 BackupDropdown =
     BackupSection:CreateDropdown(
