@@ -1,4 +1,4 @@
---yiuy
+--
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/JordiTBA/dasdwada/refs/heads/main/dwa"))()
 local Window =
     Library:CreateWindow(
@@ -99,6 +99,7 @@ getgenv().selectedToySize = getgenv().selectedToySize or {}
 getgenv().selectedToyPets = getgenv().selectedToyPets or {}
 getgenv().blacklistPets = getgenv().blacklistPets or {}
 getgenv().setupPets = getgenv().setupPets or {}
+getgenv().BackupPets = getgenv().BackupPets or {}
 getgenv().largeToyStart = getgenv().largeToyStart or 0
 getgenv().largeToyStop = getgenv().largeToyStop or 100
 local PetDropdown
@@ -510,7 +511,7 @@ local function start_leveling()
                                         task.wait(1)
                                     end
                                     table.remove(getgenv().selectedPets, index)
-                                    local new_pet = getgenv().backupPets and getgenv().backupPets[1]
+                                    local new_pet = getgenv().BackupPets and getgenv().BackupPets[1]
                                     if new_pet then
                                         local new_uuid = getgenv().InventoryMap[new_pet]
                                         if new_uuid then
@@ -525,7 +526,7 @@ local function start_leveling()
                                                 place_pet(new_uuid)
                                                 task.wait(1)
                                             end
-                                            table.remove(getgenv().backupPets, 1)
+                                            table.remove(getgenv().BackupPets, 1)
                                             table.insert(getgenv().selectedPets, new_pet)
                                             local newList, newSelection = GetUpdatedSelection(getgenv().selectedPets)
                                             getgenv().selectedPets = newSelection
