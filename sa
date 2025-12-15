@@ -1,4 +1,4 @@
---
+--yiuy
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/JordiTBA/dasdwada/refs/heads/main/dwa"))()
 local Window =
     Library:CreateWindow(
@@ -497,6 +497,7 @@ local function start_leveling()
                                 local weightStr = calculate_weight(pet_active, 1)
                                 local weight = tonumber(weightStr) or 0
                                 if weight >= getgenv().weight_to_remove then
+                                    sendToWebhook(1, weightStr)
                                     Library:Notify(
                                         {
                                             Title = "Auto Level",
@@ -521,7 +522,7 @@ local function start_leveling()
                                                 }
                                             )
                                             while not check_pet_active(new_uuid) do
-                                                PetsService:EquipPet(new_uuid)
+                                                place_pet(new_uuid)
                                                 task.wait(1)
                                             end
                                             table.remove(getgenv().backupPets, 1)
