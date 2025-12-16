@@ -1,4 +1,4 @@
---
+--sdasd
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/JordiTBA/dasdwada/refs/heads/main/dwa"))()
 local Window =
     Library:CreateWindow(
@@ -480,6 +480,10 @@ end
 local function start_leveling()
     task.spawn(
         function()
+            while check_loadout()~=1 do
+                change_loadout(1)
+                task.wait(2)
+            end
             local pcallSuccess, pcallError =
                 pcall(
                 function()
@@ -522,7 +526,7 @@ local function start_leveling()
                                                     Duration = 3
                                                 }
                                             )
-                                            while not check_pet_active(new_uuid) do
+                                            while not check_pet_active(new_uuid) and check_loadout()== 1 do
                                                 place_pet(new_uuid)
                                                 task.wait(1)
                                             end
