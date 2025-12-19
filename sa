@@ -281,7 +281,7 @@ local function refreshPetData()
             local lvlAttr = petData:GetAttribute("Level")
             local lvlMatch = full:match("Level%s*(%d+)") or full:match("Lvl%s*(%d+)") or full:match("Age%s*(%d+)")
             level = lvlAttr or (lvlMatch and tonumber(lvlMatch)) or "Unknown"
-            like = petData:GetAttribute("d") and "Fav" or "Unfav" 
+            like = petData:GetAttribute("d") and "Fav" or "Unfav"
             status = "[Backpack]"
         elseif type(petData) == "table" then
             uuid = petData.UUID or "NoUUID"
@@ -469,21 +469,96 @@ end
 local function trigger()
     local Loadout = check_loadout()
     while check_loadout() == Loadout do
-        change_loadout(Loadout + 1 )
+        change_loadout(Loadout + 1)
         task.wait(2)
     end
-    while check_loadout()~=Loadout do
+    while check_loadout() ~= Loadout do
         change_loadout(Loadout)
         task.wait(2)
     end
 end
+local function acc_remove(table_remove)
+    for index, pet in pairs(table_remove) do
+        local uuid = getgenv().InventoryMap[pet.name]
+        sendToWebhook(1, pet.weightStr)
+        Library:Notify(
+            {
+                Title = "Auto Level",
+                Content = "Unequip pet " .. pet.name .. " with weight " .. pet.weightStr .. " KG",
+                Duration = 3
+            }
+        )
+        while check_pet_active(uuid) do
+            PetsService:UnequipPet(uuid)
+            task.wait(1.2)
+        end
+        table.remove(getgenv().selectedPets, index)
+        local new_pet = getgenv().BackupPets and getgenv().BackupPets[1]
+        if new_pet then
+            local new_uuid = getgenv().InventoryMap[new_pet]
+            if new_uuid then
+                Library:Notify(
+                    {
+                        Title = "Auto Level",
+                        Content = "Equip backup pet " .. new_pet,
+                        Duration = 3
+                    }
+                )
+                while not check_pet_active(new_uuid) and check_loadout() == 1 do
+                    place_pet(new_uuid)
+                    task.wait(1)
+                end
+                table.remove(getgenv().BackupPets, 1)
+                table.insert(getgenv().selectedPets, new_pet)
+                local newList, newSelection = GetUpdatedSelection(getgenv().selectedPets)
+                getgenv().selectedPets = newSelection
+                PetDropdown:Refresh(newList, newSelection)
+                local newList, newSelection = GetUpdatedSelection(getgenv().BackupPets)
+                getgenv().BackupPets = newSelection
+
+                local unselected = {}
+                local selected_lookup = {}
+                for _, v in pairs(getgenv().selectedPets) do
+                    selected_lookup[v] = true
+                end
+
+                for _, pet_string in pairs(newList) do
+                    if not selected_lookup[pet_string] then
+                        table.insert(unselected, pet_string)
+                    end
+                end
+
+                local validBackupSelection = {}
+                for _, v in pairs(newSelection) do
+                    if not selected_lookup[v] then
+                        table.insert(validBackupSelection, v)
+                    end
+                end
+                getgenv().BackupPets = validBackupSelection
+
+                if #unselected == 0 then
+                    unselected = {"No available backup pets"}
+                end
+                BackupDropdown:Refresh(unselected, validBackupSelection)
+            end
+        end
+    end
+    trigger()
+end
+getgenv().table_remove = {}
 local function start_leveling()
     task.spawn(
         function()
-            while check_loadout()~=1 do
+            while check_loadout() ~= 1 do
                 change_loadout(1)
                 task.wait(2)
             end
+            if #getgenv().table_remove > 0 then
+                acc_remove(getgenv().table_remove)
+                getgenv().table_remove = {}
+                return
+            end
+
             local pcallSuccess, pcallError =
                 pcall(
                 function()
@@ -502,69 +577,7 @@ local function start_leveling()
                                 local weightStr = calculate_weight(pet_active, 1)
                                 local weight = tonumber(weightStr) or 0
                                 if weight >= getgenv().weight_to_remove then
-                                    sendToWebhook(1, weightStr)
-                                    Library:Notify(
-                                        {
-                                            Title = "Auto Level",
-                                            Content = "Unequip pet " .. name .. " with weight " .. weightStr .. " KG",
-                                            Duration = 3
-                                        }
-                                    )
-                                    while check_pet_active(uuid) do
-                                        PetsService:UnequipPet(uuid)
-                                        task.wait(1)
-                                    end
-                                    table.remove(getgenv().selectedPets, index)
-                                    local new_pet = getgenv().BackupPets and getgenv().BackupPets[1]
-                                    if new_pet then
-                                        local new_uuid = getgenv().InventoryMap[new_pet]
-                                        if new_uuid then
-                                            Library:Notify(
-                                                {
-                                                    Title = "Auto Level",
-                                                    Content = "Equip backup pet " .. new_pet,
-                                                    Duration = 3
-                                                }
-                                            )
-                                            while not check_pet_active(new_uuid) and check_loadout()== 1 do
-                                                place_pet(new_uuid)
-                                                task.wait(1)
-                                            end
-                                            table.remove(getgenv().BackupPets, 1)
-                                            table.insert(getgenv().selectedPets, new_pet)
-                                            local newList, newSelection = GetUpdatedSelection(getgenv().selectedPets)
-                                            getgenv().selectedPets = newSelection
-                                            PetDropdown:Refresh(newList, newSelection)
-                                            local newList, newSelection = GetUpdatedSelection(getgenv().BackupPets)
-                                            getgenv().BackupPets = newSelection
-
-                                            local unselected = {}
-                                            local selected_lookup = {}
-                                            for _, v in pairs(getgenv().selectedPets) do
-                                                selected_lookup[v] = true
-                                            end
-
-                                            for _, pet_string in pairs(newList) do
-                                                if not selected_lookup[pet_string] then
-                                                    table.insert(unselected, pet_string)
-                                                end
-                                            end
-
-                                            local validBackupSelection = {}
-                                            for _, v in pairs(newSelection) do
-                                                if not selected_lookup[v] then
-                                                    table.insert(validBackupSelection, v)
-                                                end
-                                            end
-                                            getgenv().BackupPets = validBackupSelection
-
-                                            if #unselected == 0 then
-                                                unselected = {"No available backup pets"}
-                                            end
-                                            BackupDropdown:Refresh(unselected, validBackupSelection)
-                                        end
-                                    end
-                                    trigger()
+                                    table.insert(table_remove, {name = name, weightStr = weightStr})
                                 end
                             end
                         end
@@ -953,7 +966,7 @@ ToySection:CreateToggle(
                                 local largeToyConditionMet = false
                                 local startW = getgenv().largeToyStart or 0
                                 local stopW = getgenv().largeToyStop or 100
-                                
+
                                 if getgenv().selectedPets then
                                     for _, petName in pairs(getgenv().selectedPets) do
                                         local uuid = getgenv().InventoryMap and getgenv().InventoryMap[petName]
@@ -968,7 +981,9 @@ ToySection:CreateToggle(
                                                 end
                                             end
                                         end
-                                        if largeToyConditionMet then break end
+                                        if largeToyConditionMet then
+                                            break
+                                        end
                                     end
                                 end
 
