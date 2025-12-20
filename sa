@@ -1,4 +1,4 @@
---
+--xz
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/JordiTBA/dasdwada/refs/heads/main/dwa"))()
 local Window =
     Library:CreateWindow(
@@ -541,43 +541,41 @@ local function acc_remove(table_remove)
                 end
                 table.remove(getgenv().BackupPets, 1)
                 table.insert(getgenv().selectedPets, new_pet)
-                local newList, newSelection = GetUpdatedSelection(getgenv().selectedPets)
-                getgenv().selectedPets = newSelection
-                PetDropdown:Refresh(newList, newSelection)
-
-                -- local _, newSetupSelection = GetUpdatedSelection(getgenv().setupPets)
-                -- getgenv().setupPets = newSetupSelection
-                -- SetupPetDropdown:Refresh(newList, newSetupSelection)
-
-                local newList, newSelection = GetUpdatedSelection(getgenv().BackupPets)
-                getgenv().BackupPets = newSelection
-
-                local unselected = {}
-                local selected_lookup = {}
-                for _, v in pairs(getgenv().selectedPets) do
-                    selected_lookup[v] = true
-                end
-
-                for _, pet_string in pairs(newList) do
-                    if not selected_lookup[pet_string] then
-                        table.insert(unselected, pet_string)
-                    end
-                end
-
-                local validBackupSelection = {}
-                for _, v in pairs(newSelection) do
-                    if not selected_lookup[v] then
-                        table.insert(validBackupSelection, v)
-                    end
-                end
-                getgenv().BackupPets = validBackupSelection
-
-                if #unselected == 0 then
-                    unselected = {"No available backup pets"}
-                end
-                BackupDropdown:Refresh(unselected, validBackupSelection)
             end
         end
+
+        -- Refresh Dropdowns (Moved outside to ensure update even if no backup pet)
+        local newList, newSelection = GetUpdatedSelection(getgenv().selectedPets)
+        getgenv().selectedPets = newSelection
+        PetDropdown:Refresh(newList, newSelection)
+
+        local newList, newSelection = GetUpdatedSelection(getgenv().BackupPets)
+        getgenv().BackupPets = newSelection
+
+        local unselected = {}
+        local selected_lookup = {}
+        for _, v in pairs(getgenv().selectedPets) do
+            selected_lookup[v] = true
+        end
+
+        for _, pet_string in pairs(newList) do
+            if not selected_lookup[pet_string] then
+                table.insert(unselected, pet_string)
+            end
+        end
+
+        local validBackupSelection = {}
+        for _, v in pairs(newSelection) do
+            if not selected_lookup[v] then
+                table.insert(validBackupSelection, v)
+            end
+        end
+        getgenv().BackupPets = validBackupSelection
+
+        if #unselected == 0 then
+            unselected = {"No available backup pets"}
+        end
+        BackupDropdown:Refresh(unselected, validBackupSelection)
     end
     trigger()
 end
