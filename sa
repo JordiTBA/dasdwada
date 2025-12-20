@@ -1,4 +1,4 @@
---zz
+--
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/JordiTBA/dasdwada/refs/heads/main/dwa"))()
 local Window =
     Library:CreateWindow(
@@ -579,6 +579,8 @@ local function acc_remove(table_remove)
     trigger()
 end
 getgenv().table_remove = {}
+getgenv().isSwapping = false
+
 local function start_leveling()
     task.spawn(
         function()
@@ -586,9 +588,23 @@ local function start_leveling()
                 change_loadout(1)
                 task.wait(2)
             end
+
+            if getgenv().isSwapping then return end
+
             if #getgenv().table_remove > 0 then
-                acc_remove(getgenv().table_remove)
+                getgenv().isSwapping = true
+                local current_remove = getgenv().table_remove
                 getgenv().table_remove = {}
+                
+                local success, err = pcall(function()
+                    acc_remove(current_remove)
+                end)
+                
+                if not success then
+                    warn("Error in acc_remove: " .. tostring(err))
+                end
+                
+                getgenv().isSwapping = false
                 return
             end
 
