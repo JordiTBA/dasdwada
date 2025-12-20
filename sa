@@ -1,4 +1,4 @@
---xz
+--zz
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/JordiTBA/dasdwada/refs/heads/main/dwa"))()
 local Window =
     Library:CreateWindow(
@@ -247,7 +247,7 @@ local function calculate_weight(petData, level_check)
     local pData = petData.PetData
 
     if not pType or not pData then
-        return "0.00"
+        return nil
     end
 
     local baseWeight = pData.BaseWeight or 1
@@ -255,9 +255,8 @@ local function calculate_weight(petData, level_check)
 
     if PetUtilities then
         return string.format("%.2f", PetUtilities:CalculateWeight(baseWeight, math.min(level, 100)))
-    else
-        return "0.00"
     end
+    return nil
 end
 
 -- Removed function check_blacklist(UUID)
@@ -612,6 +611,9 @@ local function start_leveling()
                             local uuid = getgenv().InventoryMap[name]
                             if pet_active.UUID == uuid then
                                 local weightStr = calculate_weight(pet_active, 1)
+                                if not weightStr then
+                                    return
+                                end 
                                 local weight = tonumber(weightStr) or 0
                                 if weight >= getgenv().weight_to_remove then
                                     table.insert(getgenv().table_remove, {index = index, name = name, weightStr = weightStr})
