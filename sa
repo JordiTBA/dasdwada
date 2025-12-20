@@ -1,4 +1,4 @@
---
+--ds
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/JordiTBA/dasdwada/refs/heads/main/dwa"))()
 local Window =
     Library:CreateWindow(
@@ -467,7 +467,7 @@ local function equip_setup_pets()
     end
 end
 local function trigger()
-    local Loadout = check_loadout()
+    local Loadout = 1
     while check_loadout() == Loadout do
         change_loadout(Loadout + 1)
         task.wait(2)
@@ -478,6 +478,7 @@ local function trigger()
     end
 end
 local function acc_remove(table_remove)
+
     for index, pet in pairs(table_remove) do
         local uuid = getgenv().InventoryMap[pet.name]
         sendToWebhook(1, pet.weightStr)
@@ -488,12 +489,19 @@ local function acc_remove(table_remove)
                 Duration = 3
             }
         )
+        
         while check_pet_active(uuid) do
             PetsService:UnequipPet(uuid)
-            task.wait(1.2)
+            wait(1.2)
         end
         table.remove(getgenv().selectedPets, index)
         local new_pet = getgenv().BackupPets and getgenv().BackupPets[1]
+                                local success, myActivePets =
+                        pcall(
+                        function()
+                            return PetUtilities:GetPetsSortedByAge(LocalPlayer, 0, false, true)
+                        end
+                    )
         if new_pet then
             local new_uuid = getgenv().InventoryMap[new_pet]
             if new_uuid then
@@ -504,9 +512,9 @@ local function acc_remove(table_remove)
                         Duration = 3
                     }
                 )
-                while not check_pet_active(new_uuid) and check_loadout() == 1 do
+                while not check_pet_active(new_uuid) and check_loadout() == 1 and #myActivePets < get_max_slots() do
                     place_pet(new_uuid)
-                    task.wait(1)
+                    wait(1)
                 end
                 table.remove(getgenv().BackupPets, 1)
                 table.insert(getgenv().selectedPets, new_pet)
@@ -563,13 +571,16 @@ local function start_leveling()
                 pcall(
                 function()
                     equip_selected_pets()
-                    equip_setup_pets()
+                    -- equip_setup_pets()
                     local success, myActivePets =
                         pcall(
                         function()
                             return PetUtilities:GetPetsSortedByAge(LocalPlayer, 0, false, true)
                         end
                     )
+                    if not success or not myActivePets then
+                        return
+                    end
                     for key, pet_active in pairs(myActivePets) do
                         for index, name in pairs(getgenv().selectedPets) do
                             local uuid = getgenv().InventoryMap[name]
@@ -577,7 +588,7 @@ local function start_leveling()
                                 local weightStr = calculate_weight(pet_active, 1)
                                 local weight = tonumber(weightStr) or 0
                                 if weight >= getgenv().weight_to_remove then
-                                    table.insert(table_remove, {name = name, weightStr = weightStr})
+                                    table.insert(getgenv().table_remove, {name = name, weightStr = weightStr})
                                 end
                             end
                         end
