@@ -1,4 +1,4 @@
---ds
+--
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/JordiTBA/dasdwada/refs/heads/main/dwa"))()
 local Window =
     Library:CreateWindow(
@@ -98,12 +98,12 @@ getgenv().Level_target = getgenv().Level_target or 0
 getgenv().selectedToySize = getgenv().selectedToySize or {}
 getgenv().selectedToyPets = getgenv().selectedToyPets or {}
 getgenv().blacklistPets = getgenv().blacklistPets or {}
-getgenv().setupPets = getgenv().setupPets or {}
+-- getgenv().setupPets = getgenv().setupPets or {}
 getgenv().BackupPets = getgenv().BackupPets or {}
 getgenv().largeToyStart = getgenv().largeToyStart or 0
 getgenv().largeToyStop = getgenv().largeToyStop or 100
 local PetDropdown
-local SetupPetDropdown
+-- local SetupPetDropdown
 local BackupDropdown
 local ToyPetsDropdown
 -- // Helper Functions // --
@@ -341,6 +341,11 @@ local function GetUpdatedSelection(currentSelection)
     -- 2. Refresh Data (this updates InventoryMap with new strings)
     local allNewItems = refreshPetData()
 
+    if #allNewItems == 0 then
+        warn("RefreshPetData returned 0 items. Skipping update to prevent list wipe.")
+        return {}, currentSelection
+    end
+
     -- 3. Find new strings that match the UUIDs
     for _, displayStr in ipairs(allNewItems) do
         local uuid = getgenv().InventoryMap[displayStr]
@@ -457,15 +462,15 @@ local function equip_selected_pets()
         end
     end
 end
-local function equip_setup_pets()
-    for _, pet in pairs(getgenv().setupPets) do
-        local uuid = getgenv().InventoryMap[pet]
-        if PetsService and uuid and not check_pet_active(uuid) then
-            PetsService:EquipPet(uuid)
-            task.wait(0.5)
-        end
-    end
-end
+-- local function equip_setup_pets()
+--     for _, pet in pairs(getgenv().setupPets) do
+--         local uuid = getgenv().InventoryMap[pet]
+--         if PetsService and uuid and not check_pet_active(uuid) then
+--             PetsService:EquipPet(uuid)
+--             task.wait(0.5)
+--         end
+--     end
+-- end
 local function trigger()
     local Loadout = 1
     while check_loadout() == Loadout do
@@ -478,14 +483,20 @@ local function trigger()
     end
 end
 local function acc_remove(table_remove)
+    -- Sort indices in descending order to prevent shifting issues when removing
+    table.sort(table_remove, function(a, b) return a.index > b.index end)
 
-    for index, pet in pairs(table_remove) do
-        local uuid = getgenv().InventoryMap[pet.name]
-        sendToWebhook(1, pet.weightStr)
+    for _, pet_info in pairs(table_remove) do
+        local index = pet_info.index
+        local pet_name = pet_info.name
+        local weightStr = pet_info.weightStr
+        
+        local uuid = getgenv().InventoryMap[pet_name]
+        sendToWebhook(1, weightStr)
         Library:Notify(
             {
                 Title = "Auto Level",
-                Content = "Unequip pet " .. pet.name .. " with weight " .. pet.weightStr .. " KG",
+                Content = "Unequip pet " .. pet_name .. " with weight " .. weightStr .. " KG",
                 Duration = 3
             }
         )
@@ -494,7 +505,19 @@ local function acc_remove(table_remove)
             PetsService:UnequipPet(uuid)
             wait(1.2)
         end
-        table.remove(getgenv().selectedPets, index)
+        
+        if getgenv().selectedPets[index] == pet_name then
+             table.remove(getgenv().selectedPets, index)
+        else
+             -- Fallback if index mismatch
+             for i, p in ipairs(getgenv().selectedPets) do
+                 if p == pet_name then
+                     table.remove(getgenv().selectedPets, i)
+                     break
+                 end
+             end
+        end
+
         local new_pet = getgenv().BackupPets and getgenv().BackupPets[1]
                                 local success, myActivePets =
                         pcall(
@@ -521,6 +544,11 @@ local function acc_remove(table_remove)
                 local newList, newSelection = GetUpdatedSelection(getgenv().selectedPets)
                 getgenv().selectedPets = newSelection
                 PetDropdown:Refresh(newList, newSelection)
+
+                -- local _, newSetupSelection = GetUpdatedSelection(getgenv().setupPets)
+                -- getgenv().setupPets = newSetupSelection
+                -- SetupPetDropdown:Refresh(newList, newSetupSelection)
+
                 local newList, newSelection = GetUpdatedSelection(getgenv().BackupPets)
                 getgenv().BackupPets = newSelection
 
@@ -588,7 +616,7 @@ local function start_leveling()
                                 local weightStr = calculate_weight(pet_active, 1)
                                 local weight = tonumber(weightStr) or 0
                                 if weight >= getgenv().weight_to_remove then
-                                    table.insert(getgenv().table_remove, {name = name, weightStr = weightStr})
+                                    table.insert(getgenv().table_remove, {index = index, name = name, weightStr = weightStr})
                                 end
                             end
                         end
@@ -635,20 +663,20 @@ local function CreateDropdowns()
         }
     )
 
-    SetupPetDropdown =
-        MainSection:CreateDropdown(
-        {
-            Name = "Setup Pet",
-            Items = list,
-            CurrentValue = {},
-            Multi = true,
-            Search = true,
-            Flag = "SetupPetDropdown",
-            Callback = function(Option)
-                getgenv().setupPets = Option
-            end
-        }
-    )
+    -- SetupPetDropdown =
+    --     MainSection:CreateDropdown(
+    --     {
+    --         Name = "Setup Pet",
+    --         Items = list,
+    --         CurrentValue = {},
+    --         Multi = true,
+    --         Search = true,
+    --         Flag = "SetupPetDropdown",
+    --         Callback = function(Option)
+    --             getgenv().setupPets = Option
+    --         end
+    --     }
+    -- )
 
     -- Removed Blacklist Section and Dropdown Logic
 end
@@ -663,9 +691,9 @@ MainSection:CreateButton(
             getgenv().selectedPets = newSelection
             PetDropdown:Refresh(newList, newSelection)
 
-            local _, newSetupSelection = GetUpdatedSelection(getgenv().setupPets)
-            getgenv().setupPets = newSetupSelection
-            SetupPetDropdown:Refresh(newList, newSetupSelection)
+            -- local _, newSetupSelection = GetUpdatedSelection(getgenv().setupPets)
+            -- getgenv().setupPets = newSetupSelection
+            -- SetupPetDropdown:Refresh(newList, newSetupSelection)
         end
     }
 )
