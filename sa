@@ -886,216 +886,240 @@ BackupSection:CreateButton(
     }
 )
 
--- // Pet Toy Tab // --
-local ToyTab = Window:CreateTab("Pet Toy", 4483362458)
-local ToySection = ToyTab:CreateSection("Toy Settings")
+getgenv().selectedLargeToyPets = getgenv().selectedLargeToyPets or {}
+getgenv().selectedSmallMedSizes = getgenv().selectedSmallMedSizes or {}
+getgenv().selectedSmallMedPets = getgenv().selectedSmallMedPets or {}
+getgenv().useLargeToy = false
+getgenv().useSmallMedToy = false
 
-ToySection:CreateDropdown(
-    {
-        Name = "Select Toy Size",
-        Items = {"Small Pet Toy", "Medium Pet Toy", "Large Pet Toy"},
-        CurrentValue = {},
-        Multi = true,
-        Flag = "ToySizeDropdown",
-        Callback = function(Option)
-            getgenv().selectedToySize = Option
-            print("Selected Toy Sizes:", #getgenv().selectedToySize)
-        end
-    }
-)
+local function start_toy_handler()
+    if getgenv().ToyHandlerRunning then return end
+    getgenv().ToyHandlerRunning = true
+    
+    task.spawn(function()
+        while getgenv().useLargeToy or getgenv().useSmallMedToy do
+            local success, myActivePets = pcall(function()
+                return PetUtilities:GetPetsSortedByAge(LocalPlayer, 0, false, true)
+            end)
 
-ToyPetsDropdown =
-    ToySection:CreateDropdown(
-    {
-        Name = "Select Active Pets for Toy",
-        Items = {"Click Refresh to Load"},
-        CurrentValue = {},
-        Multi = true,
-        Search = true,
-        Flag = "ToyPetsDropdown",
-        Callback = function(Option)
-            getgenv().selectedToyPets = Option
-            print("Selected Toy Pets:", #getgenv().selectedToyPets)
-        end
-    }
-)
+            local boost_amounts = {
+                ["Small Pet Toy"] = 0.1,
+                ["Medium Pet Toy"] = 0.2,
+                ["Large Pet Toy"] = 0.3
+            }
 
-ToySection:CreateButton(
-    {
-        Name = "Refresh Active Pets",
-        Callback = function()
-            local newList, newSelection = GetUpdatedSelection(getgenv().selectedToyPets)
-            getgenv().selectedToyPets = newSelection
-            ToyPetsDropdown:Refresh(newList, newSelection)
-        end
-    }
-)
+            if success and myActivePets then
+                -- 1. Handle Large Toys
+                if getgenv().useLargeToy then
+                    -- Check Large Toy Condition (Weight)
+                    local largeToyConditionMet = false
+                    local startW = getgenv().largeToyStart or 0
+                    local stopW = getgenv().largeToyStop or 100
 
-ToySection:CreateInput(
-    {
-        Name = "Large Toy Start Weight",
-        Placeholder = "0",
-        Flag = "LargeToyStart",
-        Callback = function(Text)
-            getgenv().largeToyStart = tonumber(Text) or 0
-        end
-    }
-)
-
-ToySection:CreateInput(
-    {
-        Name = "Large Toy Stop Weight",
-        Placeholder = "100",
-        Flag = "LargeToyStop",
-        Callback = function(Text)
-            getgenv().largeToyStop = tonumber(Text) or 100
-        end
-    }
-)
-
-ToySection:CreateToggle(
-    {
-        Name = "Use Toy",
-        CurrentValue = false,
-        Flag = "UseToyToggle",
-        Callback = function(Value)
-            getgenv().use_toy = Value
-
-            -- 1. Check if pets are selected
-            if Value and #getgenv().selectedToyPets == 0 then
-                Library:Notify(
-                    {
-                        Title = "Pet Toy",
-                        Content = "No pets selected!",
-                        Duration = 3
-                    }
-                )
-                getgenv().use_toy = false
-                return
-            end
-
-            if not Value then
-                Library:Notify(
-                    {
-                        Title = "Pet Toy",
-                        Content = "Toy usage stopped.",
-                        Duration = 3
-                    }
-                )
-                return
-            end
-
-            local toyNamesString = ""
-            if type(getgenv().selectedToySize) == "table" then
-                toyNamesString = table.concat(getgenv().selectedToySize, ", ")
-            else
-                toyNamesString = tostring(getgenv().selectedToySize)
-            end
-
-            Library:Notify(
-                {
-                    Title = "Pet Toy",
-                    Content = string.format("Using [%s] on %d pets", toyNamesString, #getgenv().selectedToyPets),
-                    Duration = 3
-                }
-            )
-
-            if getgenv().use_toy then
-                task.spawn(
-                    function()
-                        while getgenv().use_toy do
-                            local success, myActivePets =
-                                pcall(
-                                function()
-                                    return PetUtilities:GetPetsSortedByAge(LocalPlayer, 0, false, true)
-                                end
-                            )
-
-                            local boost_amounts = {
-                                ["Small Pet Toy"] = 0.1,
-                                ["Medium Pet Toy"] = 0.2,
-                                ["Large Pet Toy"] = 0.3
-                            }
-                            if success and myActivePets then
-                                -- Check Large Toy Condition from selectedPets
-                                local largeToyConditionMet = false
-                                local startW = getgenv().largeToyStart or 0
-                                local stopW = getgenv().largeToyStop or 100
-
-                                if getgenv().selectedPets then
-                                    for _, petName in pairs(getgenv().selectedPets) do
-                                        local uuid = getgenv().InventoryMap and getgenv().InventoryMap[petName]
-                                        if uuid then
-                                            for _, activePet in pairs(myActivePets) do
-                                                if activePet.UUID == uuid then
-                                                    local w = tonumber(calculate_weight(activePet, 1)) or 0
-                                                    if w >= startW and w < stopW then
-                                                        largeToyConditionMet = true
-                                                        break
-                                                    end
-                                                end
-                                            end
-                                        end
-                                        if largeToyConditionMet then
+                    if getgenv().selectedPets then
+                        for _, petName in pairs(getgenv().selectedPets) do
+                            local uuid = getgenv().InventoryMap and getgenv().InventoryMap[petName]
+                            if uuid then
+                                for _, activePet in pairs(myActivePets) do
+                                    if activePet.UUID == uuid then
+                                        local w = tonumber(calculate_weight(activePet, 1)) or 0
+                                        if w >= startW and w < stopW then
+                                            largeToyConditionMet = true
                                             break
                                         end
                                     end
                                 end
+                            end
+                            if largeToyConditionMet then break end
+                        end
+                    end
 
-                                for _, pet_id in ipairs(getgenv().selectedToyPets) do
-                                    local uuid = getgenv().InventoryMap and getgenv().InventoryMap[pet_id]
-                                    if uuid and check_pet_active(uuid) then
-                                        local currentPetData = nil
-                                        for _, pet in pairs(myActivePets) do
-                                            if pet.UUID == uuid then
-                                                currentPetData = pet
-                                                break
-                                            end
+                    if largeToyConditionMet then
+                        for _, pet_id in ipairs(getgenv().selectedLargeToyPets) do
+                            local uuid = getgenv().InventoryMap and getgenv().InventoryMap[pet_id]
+                            if uuid and check_pet_active(uuid) then
+                                local currentPetData = nil
+                                for _, pet in pairs(myActivePets) do
+                                    if pet.UUID == uuid then
+                                        currentPetData = pet
+                                        break
+                                    end
+                                end
+                                if currentPetData then
+                                    local active_boosts = {}
+                                    if currentPetData.PetData and currentPetData.PetData.Boosts then
+                                        for _, boost in pairs(currentPetData.PetData.Boosts) do
+                                            active_boosts[boost.BoostAmount] = true
                                         end
-                                        if currentPetData then
-                                            local active_boosts = {}
-                                            if currentPetData.PetData and currentPetData.PetData.Boosts then
-                                                for _, boost in pairs(currentPetData.PetData.Boosts) do
-                                                    active_boosts[boost.BoostAmount] = true
-                                                end
-                                            end
-                                            for _, toyName in pairs(getgenv().selectedToySize) do
-                                                local requiredAmount = boost_amounts[toyName]
-
-                                                local canUse = true
-                                                if toyName == "Large Pet Toy" then
-                                                    if not largeToyConditionMet then
-                                                        canUse = false
-                                                    end
-                                                end
-
-                                                if canUse and requiredAmount and not active_boosts[requiredAmount] then
-                                                    print("Menggunakan " .. toyName .. " untuk Pet ID: " .. pet_id)
-                                                    local equip = EquipTool(toyName)
-                                                    if equip then
-                                                        Library:Notify(
-                                                            {
-                                                                Title = "Pet Toy",
-                                                                Content = "Using " .. toyName .. " on pet " .. pet_id,
-                                                                Duration = 2
-                                                            }
-                                                        )
-                                                        use_toy(uuid)
-                                                        task.wait(0.5)
-                                                    else
-                                                        print("Failed to equip toy:", toyName)
-                                                    end
-                                                end
-                                            end
+                                    end
+                                    
+                                    local toyName = "Large Pet Toy"
+                                    local requiredAmount = boost_amounts[toyName]
+                                    
+                                    if requiredAmount and not active_boosts[requiredAmount] then
+                                        local equip = EquipTool(toyName)
+                                        if equip then
+                                            Library:Notify({
+                                                Title = "Large Toy",
+                                                Content = "Using " .. toyName .. " on " .. pet_id,
+                                                Duration = 2
+                                            })
+                                            use_toy(uuid)
+                                            task.wait(0.5)
                                         end
                                     end
                                 end
-                                task.wait(1)
                             end
                         end
                     end
-                )
+                end
+
+                -- 2. Handle Small/Medium Toys
+                if getgenv().useSmallMedToy then
+                    for _, pet_id in ipairs(getgenv().selectedSmallMedPets) do
+                        local uuid = getgenv().InventoryMap and getgenv().InventoryMap[pet_id]
+                        if uuid and check_pet_active(uuid) then
+                            local currentPetData = nil
+                            for _, pet in pairs(myActivePets) do
+                                if pet.UUID == uuid then
+                                    currentPetData = pet
+                                    break
+                                end
+                            end
+                            if currentPetData then
+                                local active_boosts = {}
+                                if currentPetData.PetData and currentPetData.PetData.Boosts then
+                                    for _, boost in pairs(currentPetData.PetData.Boosts) do
+                                        active_boosts[boost.BoostAmount] = true
+                                    end
+                                end
+                                
+                                for _, toyName in pairs(getgenv().selectedSmallMedSizes) do
+                                    local requiredAmount = boost_amounts[toyName]
+                                    if requiredAmount and not active_boosts[requiredAmount] then
+                                        local equip = EquipTool(toyName)
+                                        if equip then
+                                            Library:Notify({
+                                                Title = "Small/Med Toy",
+                                                Content = "Using " .. toyName .. " on " .. pet_id,
+                                                Duration = 2
+                                            })
+                                            use_toy(uuid)
+                                            task.wait(0.5)
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
             end
+            task.wait(1)
         end
-    }
-)
+        getgenv().ToyHandlerRunning = false
+    end)
+end
+
+-- // Pet Toy Tab // --
+local ToyTab = Window:CreateTab("Pet Toy", 4483362458)
+
+-- === Large Toy Section ===
+local LargeToySection = ToyTab:CreateSection("Large Toy Settings")
+
+local LargeToyPetsDropdown = LargeToySection:CreateDropdown({
+    Name = "Select Active Pets (Large)",
+    Items = {"Click Refresh to Load"},
+    CurrentValue = {},
+    Multi = true,
+    Search = true,
+    Flag = "LargeToyPetsDropdown",
+    Callback = function(Option)
+        getgenv().selectedLargeToyPets = Option
+    end
+})
+
+LargeToySection:CreateButton({
+    Name = "Refresh Active Pets",
+    Callback = function()
+        local newList, newSelection = GetUpdatedSelection(getgenv().selectedLargeToyPets)
+        getgenv().selectedLargeToyPets = newSelection
+        LargeToyPetsDropdown:Refresh(newList, newSelection)
+    end
+})
+
+LargeToySection:CreateInput({
+    Name = "Large Toy Start Weight",
+    Placeholder = "0",
+    Flag = "LargeToyStart",
+    Callback = function(Text)
+        getgenv().largeToyStart = tonumber(Text) or 0
+    end
+})
+
+LargeToySection:CreateInput({
+    Name = "Large Toy Stop Weight",
+    Placeholder = "100",
+    Flag = "LargeToyStop",
+    Callback = function(Text)
+        getgenv().largeToyStop = tonumber(Text) or 100
+    end
+})
+
+LargeToySection:CreateToggle({
+    Name = "Use Large Toy",
+    CurrentValue = false,
+    Flag = "UseLargeToyToggle",
+    Callback = function(Value)
+        getgenv().useLargeToy = Value
+        if Value then
+            start_toy_handler()
+        end
+    end
+})
+
+-- === Small & Medium Toy Section ===
+local SmallMedToySection = ToyTab:CreateSection("Small & Medium Toy Settings")
+
+SmallMedToySection:CreateDropdown({
+    Name = "Select Toy Size",
+    Items = {"Small Pet Toy", "Medium Pet Toy"},
+    CurrentValue = {},
+    Multi = true,
+    Flag = "SmallMedSizeDropdown",
+    Callback = function(Option)
+        getgenv().selectedSmallMedSizes = Option
+    end
+})
+
+local SmallMedPetsDropdown = SmallMedToySection:CreateDropdown({
+    Name = "Select Active Pets (Small/Med)",
+    Items = {"Click Refresh to Load"},
+    CurrentValue = {},
+    Multi = true,
+    Search = true,
+    Flag = "SmallMedPetsDropdown",
+    Callback = function(Option)
+        getgenv().selectedSmallMedPets = Option
+    end
+})
+
+SmallMedToySection:CreateButton({
+    Name = "Refresh Active Pets",
+    Callback = function()
+        local newList, newSelection = GetUpdatedSelection(getgenv().selectedSmallMedPets)
+        getgenv().selectedSmallMedPets = newSelection
+        SmallMedPetsDropdown:Refresh(newList, newSelection)
+    end
+})
+
+SmallMedToySection:CreateToggle({
+    Name = "Use Small/Med Toy",
+    CurrentValue = false,
+    Flag = "UseSmallMedToyToggle",
+    Callback = function(Value)
+        getgenv().useSmallMedToy = Value
+        if Value then
+            start_toy_handler()
+        end
+    end
+})
