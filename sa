@@ -1,4 +1,4 @@
---
+--z
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/JordiTBA/dasdwada/refs/heads/main/dwa"))()
 local Window =
     Library:CreateWindow(
@@ -892,91 +892,42 @@ getgenv().selectedSmallMedPets = getgenv().selectedSmallMedPets or {}
 getgenv().useLargeToy = false
 getgenv().useSmallMedToy = false
 
-local function start_toy_handler()
-    if getgenv().ToyHandlerRunning then return end
-    getgenv().ToyHandlerRunning = true
+local function start_large_toy_handler()
+    if getgenv().LargeToyHandlerRunning then return end
+    getgenv().LargeToyHandlerRunning = true
     
     task.spawn(function()
-        while getgenv().useLargeToy or getgenv().useSmallMedToy do
+        while getgenv().useLargeToy do
             local success, myActivePets = pcall(function()
                 return PetUtilities:GetPetsSortedByAge(LocalPlayer, 0, false, true)
             end)
 
-            local boost_amounts = {
-                ["Small Pet Toy"] = 0.1,
-                ["Medium Pet Toy"] = 0.2,
-                ["Large Pet Toy"] = 0.3
-            }
-
             if success and myActivePets then
-                -- 1. Handle Large Toys
-                if getgenv().useLargeToy then
-                    -- Check Large Toy Condition (Weight)
-                    local largeToyConditionMet = false
-                    local startW = getgenv().largeToyStart or 0
-                    local stopW = getgenv().largeToyStop or 100
+                -- Check Large Toy Condition (Weight)
+                local largeToyConditionMet = false
+                local startW = getgenv().largeToyStart or 0
+                local stopW = getgenv().largeToyStop or 100
 
-                    if getgenv().selectedPets then
-                        for _, petName in pairs(getgenv().selectedPets) do
-                            local uuid = getgenv().InventoryMap and getgenv().InventoryMap[petName]
-                            if uuid then
-                                for _, activePet in pairs(myActivePets) do
-                                    if activePet.UUID == uuid then
-                                        local w = tonumber(calculate_weight(activePet, 1)) or 0
-                                        if w >= startW and w < stopW then
-                                            largeToyConditionMet = true
-                                            break
-                                        end
-                                    end
-                                end
-                            end
-                            if largeToyConditionMet then break end
-                        end
-                    end
-
-                    if largeToyConditionMet then
-                        for _, pet_id in ipairs(getgenv().selectedLargeToyPets) do
-                            local uuid = getgenv().InventoryMap and getgenv().InventoryMap[pet_id]
-                            if uuid and check_pet_active(uuid) then
-                                local currentPetData = nil
-                                for _, pet in pairs(myActivePets) do
-                                    if pet.UUID == uuid then
-                                        currentPetData = pet
+                if getgenv().selectedPets then
+                    for _, petName in pairs(getgenv().selectedPets) do
+                        local uuid = getgenv().InventoryMap and getgenv().InventoryMap[petName]
+                        if uuid then
+                            for _, activePet in pairs(myActivePets) do
+                                if activePet.UUID == uuid then
+                                    local w = tonumber(calculate_weight(activePet, 1)) or 0
+                                    if w >= startW and w < stopW then
+                                        largeToyConditionMet = true
                                         break
                                     end
                                 end
-                                if currentPetData then
-                                    local active_boosts = {}
-                                    if currentPetData.PetData and currentPetData.PetData.Boosts then
-                                        for _, boost in pairs(currentPetData.PetData.Boosts) do
-                                            active_boosts[boost.BoostAmount] = true
-                                        end
-                                    end
-                                    
-                                    local toyName = "Large Pet Toy"
-                                    local requiredAmount = boost_amounts[toyName]
-                                    
-                                    if requiredAmount and not active_boosts[requiredAmount] then
-                                        local equip = EquipTool(toyName)
-                                        if equip then
-                                            Library:Notify({
-                                                Title = "Large Toy",
-                                                Content = "Using " .. toyName .. " on " .. pet_id,
-                                                Duration = 2
-                                            })
-                                            use_toy(uuid)
-                                            task.wait(0.5)
-                                        end
-                                    end
-                                end
                             end
                         end
+                        if largeToyConditionMet then break end
                     end
                 end
 
-                -- 2. Handle Small/Medium Toys
-                if getgenv().useSmallMedToy then
-                    for _, pet_id in ipairs(getgenv().selectedSmallMedPets) do
+                if largeToyConditionMet then
+                    for _, pet_id in ipairs(getgenv().selectedLargeToyPets) do
                         local uuid = getgenv().InventoryMap and getgenv().InventoryMap[pet_id]
                         if uuid and check_pet_active(uuid) then
                             local currentPetData = nil
@@ -994,19 +945,19 @@ local function start_toy_handler()
                                     end
                                 end
                                 
-                                for _, toyName in pairs(getgenv().selectedSmallMedSizes) do
-                                    local requiredAmount = boost_amounts[toyName]
-                                    if requiredAmount and not active_boosts[requiredAmount] then
-                                        local equip = EquipTool(toyName)
-                                        if equip then
-                                            Library:Notify({
-                                                Title = "Small/Med Toy",
-                                                Content = "Using " .. toyName .. " on " .. pet_id,
-                                                Duration = 2
-                                            })
-                                            use_toy(uuid)
-                                            task.wait(0.5)
-                                        end
+                                local toyName = "Large Pet Toy"
+                                local requiredAmount = 0.3
+                                
+                                if requiredAmount and not active_boosts[requiredAmount] then
+                                    local equip = EquipTool(toyName)
+                                    if equip then
+                                        Library:Notify({
+                                            Title = "Large Toy",
+                                            Content = "Using " .. toyName .. " on " .. pet_id,
+                                            Duration = 2
+                                        })
+                                        use_toy(uuid)
+                                        task.wait(0.5)
                                     end
                                 end
                             end
@@ -1016,7 +967,66 @@ local function start_toy_handler()
             end
             task.wait(1)
         end
-        getgenv().ToyHandlerRunning = false
+        getgenv().LargeToyHandlerRunning = false
+    end)
+end
+
+local function start_small_med_toy_handler()
+    if getgenv().SmallMedToyHandlerRunning then return end
+    getgenv().SmallMedToyHandlerRunning = true
+    
+    task.spawn(function()
+        while getgenv().useSmallMedToy do
+            local success, myActivePets = pcall(function()
+                return PetUtilities:GetPetsSortedByAge(LocalPlayer, 0, false, true)
+            end)
+
+            local boost_amounts = {
+                ["Small Pet Toy"] = 0.1,
+                ["Medium Pet Toy"] = 0.2
+            }
+
+            if success and myActivePets then
+                for _, pet_id in ipairs(getgenv().selectedSmallMedPets) do
+                    local uuid = getgenv().InventoryMap and getgenv().InventoryMap[pet_id]
+                    if uuid and check_pet_active(uuid) then
+                        local currentPetData = nil
+                        for _, pet in pairs(myActivePets) do
+                            if pet.UUID == uuid then
+                                currentPetData = pet
+                                break
+                            end
+                        end
+                        if currentPetData then
+                            local active_boosts = {}
+                            if currentPetData.PetData and currentPetData.PetData.Boosts then
+                                for _, boost in pairs(currentPetData.PetData.Boosts) do
+                                    active_boosts[boost.BoostAmount] = true
+                                end
+                            end
+                            
+                            for _, toyName in pairs(getgenv().selectedSmallMedSizes) do
+                                local requiredAmount = boost_amounts[toyName]
+                                if requiredAmount and not active_boosts[requiredAmount] then
+                                    local equip = EquipTool(toyName)
+                                    if equip then
+                                        Library:Notify({
+                                            Title = "Small/Med Toy",
+                                            Content = "Using " .. toyName .. " on " .. pet_id,
+                                            Duration = 2
+                                        })
+                                        use_toy(uuid)
+                                        task.wait(0.5)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            task.wait(1)
+        end
+        getgenv().SmallMedToyHandlerRunning = false
     end)
 end
 
@@ -1072,7 +1082,7 @@ LargeToySection:CreateToggle({
     Callback = function(Value)
         getgenv().useLargeToy = Value
         if Value then
-            start_toy_handler()
+            start_large_toy_handler()
         end
     end
 })
@@ -1119,7 +1129,7 @@ SmallMedToySection:CreateToggle({
     Callback = function(Value)
         getgenv().useSmallMedToy = Value
         if Value then
-            start_toy_handler()
+            start_small_med_toy_handler()
         end
     end
 })
