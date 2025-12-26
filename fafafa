@@ -1,4 +1,4 @@
--- main.lua (versi fast-load)
+-- main.lua (versi fast-load)z
 ----------------------------------------------------------------
 -- MINI LOADER (Battery Charging) - NodeHub (Black/Neon Yellow)
 -- taruh di paling atas main.lua
@@ -353,7 +353,16 @@ end
 -- =========================
 -- MAINUI ADAPTER (Jordi Hub)
 -- =========================
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/JordiTBA/dasdwada/refs/heads/main/dwa"))()
+local Library
+pcall(function()
+    Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/JordiTBA/dasdwada/refs/heads/main/dwa"))()
+end)
+
+if not Library then
+    warn("Failed to load Jordi Hub Library. Check URL or Executor.")
+    return
+end
+
 local MainUI = {}
 MainUI.__index = MainUI
 
