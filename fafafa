@@ -1,4 +1,4 @@
--- main.lua (versi fast-load)
+-- main.lua (versi fast-load)x
 ----------------------------------------------------------------
 -- MINI LOADER (Battery Charging) - NodeHub (Black/Neon Yellow)
 -- taruh di paling atas main.lua
@@ -258,7 +258,7 @@ local MODULE_DEFS = {
     {
         key      = "AutoKgTabs",
         name     = "AutoKG Tabs",
-        url      = "https://gtwaapi.space/sc/auto_kg/tabs_autokg.lua",
+        url      = "https://raw.githubusercontent.com/JordiTBA/dasdwada/refs/heads/main/apa",
         required = true,
     },
     {
