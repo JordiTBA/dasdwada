@@ -1,0 +1,1098 @@
+-- tabs_autokg.lua
+-- Main tab "Auto KG" â†’ sub tab:
+--   noos, boost, xp, seratusage, gbxp, settingkg(âš™)
+--
+-- âœ… Fitur:
+-- - Summary auto update global (walau tab lain sedang dibuka)
+-- - List bisa auto update (pakai listApi("setItems") + listApi("setSelected"))
+-- - GBXP auto-select kandidat baru (reconcile periodik, bukan seed sekali)
+-- - Footer: Mode picker + Start/Stop (GBXP_STAGE_MODE)
+
+local M = {}
+
+function M.Register(ui, STATE, PetListView)
+    ----------------------------------------------------------------
+    -- SAFETY DEFAULTS
+    ----------------------------------------------------------------
+    PetListView = PetListView or {
+        buildEntriesForTab = function() return {} end,
+        listPetsForTab     = function() return {} end,
+        listAllMutations   = function() return {} end,
+        buildPetItems      = function() return {} end,
+        buildPetBoostItems = function() return {} end,
+    }
+
+    STATE = STATE or {}
+
+    ----------------------------------------------------------------
+    -- helper autosave: pakai ui:SaveState() dari main.lua
+    ----------------------------------------------------------------
+    local function autoSave()
+        if ui and type(ui.SaveState) == "function" then
+            task.defer(function()
+                local ok, err = pcall(function()
+                    ui:SaveState()
+                end)
+                if not ok then
+                    warn("[AutoKG] Gagal ui:SaveState():", err)
+                end
+            end)
+        else
+            warn("[AutoKG] ui.SaveState() tidak tersedia, perubahan TIDAK di-persist.")
+        end
+    end
+
+    ----------------------------------------------------------------
+    -- GLOBALS yang dipakai state.lua
+    ----------------------------------------------------------------
+    selected = selected or {
+        boost      = {},
+        xp         = {},
+        noos       = {},
+        seratusage = {},
+        gbxp       = {},
+    }
+
+    TAB_AGE_EQUIP_MIN   = TAB_AGE_EQUIP_MIN   or {}
+    TAB_AGE_UNEQUIP_MIN = TAB_AGE_UNEQUIP_MIN or {}
+    TAB_W_EQUIP_MIN     = TAB_W_EQUIP_MIN     or {}
+    TAB_W_UNEQUIP_MAX   = TAB_W_UNEQUIP_MAX   or {}
+
+    local ALL_TABS = { "noos", "boost", "seratusage", "xp", "gbxp" }
+
+    local function ensureTabDefaults(tabKey)
+        TAB_AGE_EQUIP_MIN[tabKey]   = tonumber(TAB_AGE_EQUIP_MIN[tabKey])   or 0
+        TAB_AGE_UNEQUIP_MIN[tabKey] = tonumber(TAB_AGE_UNEQUIP_MIN[tabKey]) or 0
+
+        TAB_W_EQUIP_MIN[tabKey]     = tonumber(TAB_W_EQUIP_MIN[tabKey])     or 0
+        TAB_W_UNEQUIP_MAX[tabKey]   = tonumber(TAB_W_UNEQUIP_MAX[tabKey])   or 999999
+
+        selected[tabKey] = selected[tabKey] or {}
+    end
+
+    for _, k in ipairs(ALL_TABS) do
+        ensureTabDefaults(k)
+    end
+
+    ----------------------------------------------------------------
+    -- UI REGISTRY (biar bisa update walau tab lain aktif)
+    ----------------------------------------------------------------
+    local UIREF = {
+        tabs = {},         -- [tabKey] = { listApi=..., selSet=... }
+        summaryTitles = {},-- [tabKey] = summaryTitle
+    }
+
+    ----------------------------------------------------------------
+    -- Helper: hitung total selected & bikin teks summary
+    ----------------------------------------------------------------
+    local function countSelected(setTbl)
+        local n = 0
+        if type(setTbl) == "table" then
+            for _, on in pairs(setTbl) do
+                if on then n += 1 end
+            end
+        end
+        return n
+    end
+
+    local function buildSummaryText()
+        local cNoos  = countSelected(selected.noos)
+        local cBoost = countSelected(selected.boost)
+        local c100   = countSelected(selected.seratusage)
+        local cXP    = countSelected(selected.xp)
+        local cGBXP  = countSelected(selected.gbxp)
+
+        return string.format(
+            "ðŸ˜ Elephant (%d)    ðŸŒ™ Nightmare (%d)    ðŸ’¯ 100 Age (%d)    ðŸ“˜ XP (%d)    ðŸ§ª GBXP (%d)",
+            cNoos, cBoost, c100, cXP, cGBXP
+        )
+    end
+
+    local function refreshAllSummary()
+        local txt = buildSummaryText()
+        for _, title in pairs(UIREF.summaryTitles) do
+            if title and title.Parent then
+                title.Text = txt
+            end
+        end
+    end
+
+    ----------------------------------------------------------------
+    -- LIST REFRESH (butuh CreateRowList API setItems & setSelected)
+    ----------------------------------------------------------------
+    local function refreshTabList(tabKey)
+        local ref = UIREF.tabs[tabKey]
+        if not ref or not ref.listApi or type(ref.listApi) ~= "function" then
+            return
+        end
+
+        local entries = {}
+        local ok, res = pcall(function()
+            return PetListView.buildEntriesForTab(tabKey, ref.selSet)
+        end)
+        if ok and type(res) == "table" then
+            entries = res
+        end
+
+        pcall(function()
+            ref.listApi("setItems", entries)
+        end)
+
+        local map = {}
+        for uuid, on in pairs(ref.selSet or {}) do
+            if on then map[uuid] = true end
+        end
+        pcall(function()
+            ref.listApi("setSelected", map)
+        end)
+    end
+
+    ----------------------------------------------------------------
+    -- AUTO SELECT GBXP (reconcile periodik)
+    ----------------------------------------------------------------
+    if STATE.gbxpAutoSelect == nil then
+        STATE.gbxpAutoSelect = true
+    end
+
+    local function reconcileGBXP()
+        if STATE.gbxpAutoSelect ~= true then
+            return
+        end
+
+        selected.gbxp = selected.gbxp or {}
+
+        local ok, pets = pcall(function()
+            return PetListView.listPetsForTab("gbxp")
+        end)
+        if not ok or type(pets) ~= "table" then
+            return
+        end
+
+        local changed = false
+        for _, p in ipairs(pets) do
+            local uuid = p and p.uuid
+            if uuid and not selected.gbxp[uuid] then
+                selected.gbxp[uuid] = true
+                changed = true
+            end
+        end
+
+        if changed then
+            autoSave()
+            refreshAllSummary()
+            refreshTabList("gbxp")
+        end
+    end
+
+    ----------------------------------------------------------------
+    -- MAIN TAB: Auto KG
+    ----------------------------------------------------------------
+    ui:RegisterMainTab("autokg", "Auto KG", 1)
+
+    ----------------------------------------------------------------
+    -- Helper: bangun satu sub-tab AutoKG generik
+    ----------------------------------------------------------------
+    local function buildAutoKGSubTab(tabKey, niceName, order)
+        ui:RegisterSubTab("autokg", tabKey, niceName, function()
+            ui:ClearSubContent()
+
+            ensureTabDefaults(tabKey)
+
+            -- list untuk menyimpan setter setiap section
+            local sectionSetters = {}
+            local function createSection(title)
+                local body, setExpanded = ui:CreateSection(title, true)
+                table.insert(sectionSetters, setExpanded)
+                return body
+            end
+
+            --------------------------------------------------------
+            -- SECTION: Threshold Age & KG untuk tab ini
+            --------------------------------------------------------
+            local sectionTitle = string.format("( %s Team ) Threshold Age & Kg", niceName)
+            local body = createSection(sectionTitle)
+
+            local selSet = selected[tabKey]
+
+            --------------------------------------------------------
+            -- ROW LABEL: SUMMARY TOTAL SEMUA TAB
+            --------------------------------------------------------
+            local summaryRow, summaryTitle
+            if ui.CreateRowLabel then
+                summaryRow, summaryTitle = ui:CreateRowLabel(body, buildSummaryText())
+            else
+                local row = Instance.new("Frame")
+                row.Name = "Row_Summary"
+                row.BackgroundTransparency = 1
+                row.Size = UDim2.new(1, 0, 0, 20)
+                row.Parent = body
+
+                local txt = Instance.new("TextLabel")
+                txt.BackgroundTransparency = 1
+                txt.Size = UDim2.new(1, 0, 1, 0)
+                txt.Font = Enum.Font.GothamSemibold
+                txt.TextSize = 12
+                txt.TextXAlignment = Enum.TextXAlignment.Left
+                txt.TextColor3 = Color3.fromRGB(255, 230, 120)
+                txt.TextWrapped = true
+                txt.Text = buildSummaryText()
+                txt.Parent = row
+
+                summaryRow   = row
+                summaryTitle = txt
+            end
+
+            if summaryTitle then
+                summaryTitle.TextColor3 = Color3.fromRGB(255, 230, 120)
+                summaryTitle.Font       = Enum.Font.GothamSemibold
+                summaryTitle.TextSize   = 12
+                summaryTitle.TextWrapped = true
+            end
+
+            -- register summary title untuk global refresh
+            UIREF.summaryTitles[tabKey] = summaryTitle
+
+            --------------------------------------------------------
+            -- 1) Equip Age
+            --------------------------------------------------------
+            ui:CreateRowInput(body, "Equip Age", tostring(TAB_AGE_EQUIP_MIN[tabKey]), function(text)
+                local v = tonumber(text)
+                if v then
+                    TAB_AGE_EQUIP_MIN[tabKey] = v
+                    autoSave()
+                else
+                    warn(string.format("[AutoKG/%s] Equip Age tidak valid: %s", tabKey, text))
+                end
+            end)
+
+            --------------------------------------------------------
+            -- 2) Unequip Age
+            --------------------------------------------------------
+            ui:CreateRowInput(body, "Unequip Age", tostring(TAB_AGE_UNEQUIP_MIN[tabKey]), function(text)
+                local v = tonumber(text)
+                if v then
+                    TAB_AGE_UNEQUIP_MIN[tabKey] = v
+                    autoSave()
+                else
+                    warn(string.format("[AutoKG/%s] Unequip Age tidak valid: %s", tabKey, text))
+                end
+            end)
+
+            --------------------------------------------------------
+            -- 3) Equip W100 Min
+            --------------------------------------------------------
+            ui:CreateRowInput(body, "Equip When KG Min ( Assumed at age 100 )", tostring(TAB_W_EQUIP_MIN[tabKey]), function(text)
+                local v = tonumber(text)
+                if v then
+                    TAB_W_EQUIP_MIN[tabKey] = v
+                    autoSave()
+                else
+                    warn(string.format("[AutoKG/%s] Equip W100 Min tidak valid: %s", tabKey, text))
+                end
+            end)
+
+            --------------------------------------------------------
+            -- 4) Unequip W100 Max
+            --------------------------------------------------------
+            ui:CreateRowInput(body, "Unequip When KG Max ( Assumed at age 100 )", tostring(TAB_W_UNEQUIP_MAX[tabKey]), function(text)
+                local v = tonumber(text)
+                if v then
+                    TAB_W_UNEQUIP_MAX[tabKey] = v
+                    autoSave()
+                else
+                    warn(string.format("[AutoKG/%s] Unequip W100 Max tidak valid: %s", tabKey, text))
+                end
+            end)
+            
+            --------------------------------------------------------
+-- GBXP: Max Equip
+--------------------------------------------------------
+if tabKey == "gbxp" then
+    GBXP_MAX_EQUIP = tonumber(GBXP_MAX_EQUIP) or 2
+
+    ui:CreateRowInput(body, "GBXP Max Equip", tostring(GBXP_MAX_EQUIP), function(text)
+        local v = tonumber(text)
+        if v then
+            -- clamp biar aman (optional)
+            if v < 1 then v = 1 end
+            if v > 8 then v = 8 end
+
+            GBXP_MAX_EQUIP = v
+            autoSave()
+
+            -- kalau kamu mau trigger refresh loop lain:
+            _G.__AUTOKG_DIRTY = true
+        else
+            warn("[AutoKG/gbxp] GBXP Max Equip tidak valid:", text)
+        end
+    end)
+end
+
+
+            --------------------------------------------------------
+            -- LIST: Daftar Pet untuk tab ini
+            --------------------------------------------------------
+            local listLabel
+            if tabKey == "gbxp" then
+                listLabel = "Select Pet GBXP (Non Favorite)"
+            elseif tabKey == "noos" then
+                listLabel = "Select Pet Elephant Team (Favorite List)"
+            elseif tabKey == "boost" then
+                listLabel = "Select Pet Nightmare Team (Favorite List)"
+            elseif tabKey == "xp" then
+                listLabel = "Select Pet XP Team (Favorite List)"
+            elseif tabKey == "seratusage" then
+                listLabel = "Select Pet 100 Age Team (Favorite List)"
+            else
+                listLabel = "Select Pet"
+            end
+
+            local entries = {}
+            local okE, resE = pcall(function()
+                return PetListView.buildEntriesForTab(tabKey, selSet)
+            end)
+            if okE and type(resE) == "table" then
+                entries = resE
+            end
+
+            local _, listApi = ui:CreateRowList(body, listLabel, entries, function(key, on, label)
+                if on then
+                    selSet[key] = true
+                else
+                    selSet[key] = nil
+                end
+                autoSave()
+                refreshAllSummary()
+            end)
+
+            -- register list api untuk refresh
+            UIREF.tabs[tabKey] = {
+                listApi = listApi,
+                selSet  = selSet,
+            }
+
+            -- set selected awal
+            local preSelected = {}
+            for uuid, on in pairs(selSet) do
+                if on then preSelected[uuid] = true end
+            end
+            pcall(function()
+                listApi("setSelected", preSelected)
+            end)
+
+            -- refresh summary pertama kali
+            refreshAllSummary()
+
+            --------------------------------------------------------
+            -- Section open/close default
+            --------------------------------------------------------
+            if #sectionSetters == 1 then
+                sectionSetters[1](true)
+            else
+                for _, fn in ipairs(sectionSetters) do
+                    fn(false)
+                end
+            end
+        end, order)
+    end
+
+    ----------------------------------------------------------------
+    -- REGISTER SUB TAB TEAM
+    ----------------------------------------------------------------
+    buildAutoKGSubTab("noos",       "Elephant",  1)
+    buildAutoKGSubTab("boost",      "Nightmare", 2)
+    buildAutoKGSubTab("seratusage", "100 Age",   3)
+    buildAutoKGSubTab("xp",         "XP",        4)
+    buildAutoKGSubTab("gbxp",       "GBXP",      5)
+
+    ----------------------------------------------------------------
+    -- SUB TAB: settingkg (âš™)
+    ----------------------------------------------------------------
+    ui:RegisterSubTab("autokg", "settingkg", "âš™", function()
+        ui:ClearSubContent()
+
+        local sectionSetters = {}
+        local function createSection(title)
+            local body, setExpanded = ui:CreateSection(title, true)
+            table.insert(sectionSetters, setExpanded)
+            return body
+        end
+
+        -- sync toggle mutation dari global yang di-load state.lua
+        if STATE.autokgMutationEnabled == nil then
+            STATE.autokgMutationEnabled = (AUTOKG_MUTATION_ENABLED == true)
+        end
+
+        if STATE.autoBoostEnabled == nil then
+            STATE.autoBoostEnabled = (AUTO_BOOST_ENABLED == true)
+        end
+
+        local body1 = createSection("Auto Shard Cleaner")
+        local body2 = createSection("Auto Boost")
+        local body3 = createSection(" Auto Feed (Fruit)")
+        local body4 = createSection("Auto Collect (Fruit)")
+        
+
+        ------------------------------------------------------
+        -- MUTATION DROPDOWN
+        ------------------------------------------------------
+        local mutationItems = {}
+        do
+            local mutList = {}
+            local ok, res = pcall(function()
+                return PetListView.listAllMutations()
+            end)
+            if ok and type(res) == "table" then
+                mutList = res
+            end
+
+            for _, mutName in ipairs(mutList) do
+                table.insert(mutationItems, { key = mutName, name = mutName })
+            end
+        end
+
+        ui:CreateRowDropdown(body1, {
+            label       = "Select Mutation to Maintain / Keep",
+            placeholder = "Select Mutation...",
+            mode        = "multi",
+            getItems    = function() return mutationItems end,
+            initial     = GBXP_MUT_SELECTED or {},
+            onChanged   = function(mode, selectedMap)
+                GBXP_MUT_SELECTED = {}
+                if type(selectedMap) == "table" then
+                    for mutName, on in pairs(selectedMap) do
+                        if on then
+                            GBXP_MUT_SELECTED[mutName] = true
+                        end
+                    end
+                end
+                autoSave()
+            end,
+        })
+
+        ui:CreateRowToggle(
+            body1,
+            "Auto Shard Cleaner ( Mutations not selected above will be Cleaned )",
+            STATE.autokgMutationEnabled,
+            function(isOn)
+                STATE.autokgMutationEnabled = isOn and true or false
+                AUTOKG_MUTATION_ENABLED     = STATE.autokgMutationEnabled
+
+                pcall(function()
+                    if _G.WorldShardCleaner and _G.WorldShardCleaner.setEnabled then
+                        _G.WorldShardCleaner:setEnabled(STATE.autokgMutationEnabled)
+                    end
+                end)
+
+                autoSave()
+            end
+        )
+
+        ------------------------------------------------------
+        -- AUTO BOOST (Replaced with Toy Logic from gag.lua)
+        ------------------------------------------------------
+        -- Helper to sync InventoryMap for module_boost.lua
+        local function updateInventoryMap(items)
+            getgenv().InventoryMap = getgenv().InventoryMap or {}
+            for _, item in ipairs(items) do
+                -- item.name is display, item.key is UUID (usually)
+                if item.name and item.key then
+                    getgenv().InventoryMap[item.name] = item.key
+                end
+            end
+        end
+
+        local function getActivePetItems()
+            local items = {}
+            pcall(function()
+                items = PetListView.buildPetItems() or {}
+            end)
+            updateInventoryMap(items)
+            return items
+        end
+
+        -- === Large Toy Section ===
+        if ui.CreateRowLabel then
+            ui:CreateRowLabel(body2, "--- Large Toy Settings ---")
+        end
+        
+        ui:CreateRowDropdown(body2, {
+            label       = "Select Active Pets (Large)",
+            placeholder = "Select Pets...",
+            mode        = "multi",
+            getItems    = getActivePetItems,
+            initial     = function() 
+                local map = {}
+                for _, v in ipairs(getgenv().selectedLargeToyPets or {}) do
+                    map[v] = true
+                end
+                return map
+            end,
+            onChanged   = function(mode, selectedMap)
+                local list = {}
+                for k, v in pairs(selectedMap) do
+                    if v then table.insert(list, k) end
+                end
+                getgenv().selectedLargeToyPets = list
+            end,
+        })
+
+        ui:CreateRowInput(body2, "Large Toy Start Weight", tostring(getgenv().largeToyStart or 0), function(text)
+            getgenv().largeToyStart = tonumber(text) or 0
+        end)
+
+        ui:CreateRowInput(body2, "Large Toy Stop Weight", tostring(getgenv().largeToyStop or 100), function(text)
+            getgenv().largeToyStop = tonumber(text) or 100
+        end)
+
+        ui:CreateRowToggle(body2, "Use Large Toy", getgenv().useLargeToy == true, function(isOn)
+            getgenv().useLargeToy = isOn
+            if isOn and _G.AutoKGBoost and _G.AutoKGBoost.startLargeToyHandler then
+                _G.AutoKGBoost.startLargeToyHandler()
+            end
+        end)
+
+        -- === Small & Medium Toy Section ===
+        if ui.CreateRowLabel then
+            ui:CreateRowLabel(body2, "--- Small & Medium Toy Settings ---")
+        end
+
+        ui:CreateRowDropdown(body2, {
+            label       = "Select Toy Size",
+            placeholder = "Select Size...",
+            mode        = "multi",
+            getItems    = function() 
+                return {
+                    {key="Small Pet Toy", name="Small Pet Toy"},
+                    {key="Medium Pet Toy", name="Medium Pet Toy"}
+                }
+            end,
+            initial     = function()
+                local map = {}
+                for _, v in ipairs(getgenv().selectedSmallMedSizes or {}) do
+                    map[v] = true
+                end
+                return map
+            end,
+            onChanged   = function(mode, selectedMap)
+                local list = {}
+                for k, v in pairs(selectedMap) do
+                    if v then table.insert(list, k) end
+                end
+                getgenv().selectedSmallMedSizes = list
+            end,
+        })
+
+        ui:CreateRowDropdown(body2, {
+            label       = "Select Active Pets (Small/Med)",
+            placeholder = "Select Pets...",
+            mode        = "multi",
+            getItems    = getActivePetItems,
+            initial     = function()
+                local map = {}
+                for _, v in ipairs(getgenv().selectedSmallMedPets or {}) do
+                    map[v] = true
+                end
+                return map
+            end,
+            onChanged   = function(mode, selectedMap)
+                local list = {}
+                for k, v in pairs(selectedMap) do
+                    if v then table.insert(list, k) end
+                end
+                getgenv().selectedSmallMedPets = list
+            end,
+        })
+
+        ui:CreateRowToggle(body2, "Use Small/Med Toy", getgenv().useSmallMedToy == true, function(isOn)
+            getgenv().useSmallMedToy = isOn
+            if isOn and _G.AutoKGBoost and _G.AutoKGBoost.startSmallMedToyHandler then
+                _G.AutoKGBoost.startSmallMedToyHandler()
+            end
+        end)
+
+
+-- ============================================================
+-- Auto Feed (body3)
+-- ============================================================
+
+-- default state
+AUTO_FEED_ENABLED          = (AUTO_FEED_ENABLED == true)
+AUTO_FEED_DELAY            = tonumber(AUTO_FEED_DELAY or 10) or 10
+AUTO_FEED_PETS_SELECTED    = AUTO_FEED_PETS_SELECTED or {}      -- map key->true (sesuai PetItems.key)
+AUTO_FEED_FRUITS_SELECTED  = AUTO_FEED_FRUITS_SELECTED or {}    -- map fruit->true
+
+local G = (getgenv and getgenv()) or _G
+G.AUTO_FEED_ENABLED = AUTO_FEED_ENABLED
+G.AUTO_FEED_DELAY   = AUTO_FEED_DELAY
+
+-- module optional (kalau sudah ada)
+local FeedModule = rawget(_G, "AutoFeed") or rawget(_G, "AutoKGFeed") or rawget(_G, "AutoKGAutoFeed")
+
+-- items fruit (sesuaikan nama sesuai game kamu)
+local function getAutoBuy()
+    local env = (getgenv and getgenv()) or _G
+    return env.AutoBuyModule or _G.AutoBuyModule
+end
+
+local function getSeedItemsForFruit()
+    local AutoBuy = getAutoBuy()
+    if not AutoBuy or type(AutoBuy.GetLists) ~= "function" then
+        warn("[AutoFeed UI] AutoBuyModule belum siap / GetLists() tidak ada")
+        return {}
+    end
+
+    local ok, seedList = pcall(function()
+        local a = AutoBuy.GetLists() -- returns SeedItems, EggItems, GearItems
+        return a
+    end)
+
+    if ok and type(seedList) == "table" then
+        return seedList
+    end
+
+    return {}
+end
+
+local function wrapStringList(list)
+    local out = {}
+    for _, name in ipairs(list or {}) do
+        out[#out+1] = { key = tostring(name), name = tostring(name) }
+    end
+    return out
+end
+
+local function cleanSelectedMap(selectedMap)
+    local out = {}
+    for k, v in pairs(selectedMap or {}) do
+        if v == true then out[tostring(k)] = true end
+    end
+    return out
+end
+
+-- 1) Dropdown Pet (multi)
+ui:CreateRowDropdown(body3, {
+    label       = "Select Pet To Feed",
+    placeholder = "Select Pet...",
+    mode        = "multi",
+    getItems    = function() return PetItems end,
+    initial     = AUTO_FEED_PETS_SELECTED or {},
+    onChanged   = function(mode, selectedMap)
+        AUTO_FEED_PETS_SELECTED = {}
+        for k, enabled in pairs(selectedMap or {}) do
+            if enabled then
+                AUTO_FEED_PETS_SELECTED[k] = true
+            end
+        end
+        G.AUTO_FEED_PETS_SELECTED = AUTO_FEED_PETS_SELECTED
+
+        -- optional sync ke module
+        pcall(function()
+            if FeedModule and type(FeedModule.setPets) == "function" then
+                FeedModule.setPets(AUTO_FEED_PETS_SELECTED)
+            elseif FeedModule and type(FeedModule.SetPets) == "function" then
+                FeedModule.SetPets(AUTO_FEED_PETS_SELECTED)
+            elseif FeedModule and type(FeedModule.syncFromState) == "function" then
+                FeedModule:syncFromState()
+            end
+        end)
+
+        autoSave()
+    end,
+})
+
+AUTO_FEED_FRUITS_SELECTED = cleanSelectedMap(AUTO_FEED_FRUITS_SELECTED or {})
+
+ui:CreateRowDropdown(body3, {
+    label       = "Select Fruit",
+    placeholder = "Select Fruit...",
+    mode        = "multi",
+    getItems    = function()
+        local SeedNames = getSeedItemsForFruit()
+        return wrapStringList(SeedNames)
+    end,
+    initial     = AUTO_FEED_FRUITS_SELECTED,
+    onChanged   = function(_, selectedMap)
+        AUTO_FEED_FRUITS_SELECTED = cleanSelectedMap(selectedMap)
+        G.AUTO_FEED_FRUITS_SELECTED = AUTO_FEED_FRUITS_SELECTED
+
+        -- optional sync ke module feed
+        pcall(function()
+            if FeedModule and type(FeedModule.setFruits) == "function" then
+                FeedModule.setFruits(AUTO_FEED_FRUITS_SELECTED)
+            elseif FeedModule and type(FeedModule.SetFruits) == "function" then
+                FeedModule.SetFruits(AUTO_FEED_FRUITS_SELECTED)
+            elseif FeedModule and type(FeedModule.syncFromState) == "function" then
+                FeedModule:syncFromState()
+            end
+        end)
+
+        autoSave()
+    end,
+})
+
+
+-- 3) Input Hunger Under (SKALA BESAR: contoh 60000)
+local function getFeed()
+    return rawget(_G, "AutoFeed") or rawget(_G, "AutoKGFeed")
+end
+
+ui:CreateRowInput(body3, "If Hunger Under", tostring(AUTO_FEED_HUNGER_UNDER or 60000), function(text)
+    text = tostring(text or ""):gsub("%s+", "")
+    if text == "" then return end
+
+    local v = tonumber(text)
+    if not v then
+        warn("[AutoFeed] Hunger Under tidak valid: " .. tostring(text))
+        return
+    end
+
+    v = math.floor(v + 0.5)
+
+    -- âœ… jangan clamp 1..100 (hunger kamu 0..60000)
+    -- pilih max sesuai kebutuhan (aku pakai 200000 biar aman)
+    v = math.clamp(v, 1, 200000)
+
+    AUTO_FEED_HUNGER_UNDER = v
+    local G = (getgenv and getgenv()) or _G
+    G.AUTO_FEED_HUNGER_UNDER = v
+
+    -- âœ… push realtime ke module yang aktif
+    pcall(function()
+        local Feed = getFeed()
+        if not Feed then return end
+
+        if type(Feed.setHungerUnder) == "function" then
+            Feed.setHungerUnder(v)
+        elseif type(Feed.SetHungerUnder) == "function" then
+            Feed.SetHungerUnder(v)
+        elseif type(Feed.syncFromState) == "function" then
+            Feed:syncFromState()
+        else
+            Feed.HUNGER_UNDER = v
+        end
+    end)
+
+    -- autosave (anti spam)
+    task.defer(function()
+        local cur = v
+        task.wait(0.35)
+        if AUTO_FEED_HUNGER_UNDER == cur then
+            autoSave()
+        end
+    end)
+end)
+
+
+
+
+-- 4) Toggle Enable Auto Feed
+ui:CreateRowToggle(
+    body3,
+    "Enable Auto Feed",
+    AUTO_FEED_ENABLED == true,
+    function(isOn)
+        AUTO_FEED_ENABLED = isOn and true or false
+        G.AUTO_FEED_ENABLED = AUTO_FEED_ENABLED
+
+        if FeedModule then
+            if AUTO_FEED_ENABLED and FeedModule.start then
+                pcall(FeedModule.start)
+            elseif (not AUTO_FEED_ENABLED) and FeedModule.stop then
+                pcall(FeedModule.stop)
+            elseif type(FeedModule.SetEnabled) == "function" then
+                pcall(function() FeedModule.SetEnabled(AUTO_FEED_ENABLED) end)
+            elseif type(FeedModule.setEnabled) == "function" then
+                pcall(function() FeedModule.setEnabled(AUTO_FEED_ENABLED) end)
+            end
+        end
+
+        autoSave()
+    end
+)
+
+
+
+
+ui:CreateRowToggle(
+    body4,
+    "Enable Auto Collect (Fruit)",
+    AUTO_COLLECT_FRUIT_ENABLED == true,
+    function(isOn)
+        AUTO_COLLECT_FRUIT_ENABLED = isOn and true or false
+        G.AUTO_COLLECT_FRUIT_ENABLED = AUTO_COLLECT_FRUIT_ENABLED
+
+        -- coba hidup/matikan module kalau ada
+        if AutoCollectFruit then
+            if AUTO_COLLECT_FRUIT_ENABLED and AutoCollectFruit.start then
+                pcall(AutoCollectFruit.start)
+            elseif (not AUTO_COLLECT_FRUIT_ENABLED) and AutoCollectFruit.stop then
+                pcall(AutoCollectFruit.stop)
+            elseif type(AutoCollectFruit.SetEnabled) == "function" then
+                pcall(function() AutoCollectFruit.SetEnabled(AUTO_COLLECT_FRUIT_ENABLED) end)
+            elseif type(AutoCollectFruit.setEnabled) == "function" then
+                pcall(function() AutoCollectFruit.setEnabled(AUTO_COLLECT_FRUIT_ENABLED) end)
+            end
+        end
+
+        autoSave()
+    end
+)
+
+
+        if #sectionSetters == 1 then
+            sectionSetters[1](true)
+        else
+            for _, fn in ipairs(sectionSetters) do
+                fn(false)
+            end
+        end
+    end, 6)
+
+    ----------------------------------------------------------------
+    -- FOOTER: Mode Picker + Start/Stop
+    ----------------------------------------------------------------
+    -- pastikan default global
+    GBXP_STAGE_MODE = GBXP_STAGE_MODE or "auto"
+
+local function isAutoKGRunning()
+    local loop = rawget(_G, "AutoKGLoop")
+    if not loop then return false end
+    if type(loop.IsRunning) == "function" then
+        local ok, v = pcall(loop.IsRunning)
+        if ok then return v == true end
+    end
+    return loop.running == true
+end
+
+
+    local function getEffectiveModeId()
+        local m = GBXP_STAGE_MODE
+        if not m or m == "" then m = "auto" end
+        return m
+    end
+
+    local function getModeOptionsDynamic()
+        -- Ambil batas dari tab noos untuk label yang selalu up-to-date
+        local MODE_AGE_LIMIT = tonumber(TAB_AGE_EQUIP_MIN.noos) or 40
+        local MODE_KG_LIMIT  = tonumber(TAB_W_EQUIP_MIN.noos) or 60.45
+        MODE_KG_LIMIT = math.abs(MODE_KG_LIMIT)
+
+        return {
+            { id = "auto", label = "AUTO  -  Aâ†’Bâ†’Câ†’D otomatis" },
+            { id = "A",    label = "Stage A  -  Cari mutasi (Pilih mutasi di tab âš™)" },
+            { id = "B",    label = "Stage B  -  Up Age ke 40" },
+            {
+                id = "C",
+                label = string.format("Stage C  -  Up KG (Age â‰¥ %.0f & KG < %.2f) ðŸ˜", MODE_AGE_LIMIT, MODE_KG_LIMIT),
+            },
+            {
+                id = "D",
+                label = string.format("Stage D  -  Up Age sampai 100 (KG â‰¥ %.2f)", MODE_KG_LIMIT),
+            },
+            {
+                id = "BC",
+                label = string.format("Stage B + C  -  Age < %.0f & Age â‰¥ %.0f (KG < %.2f)", MODE_AGE_LIMIT, MODE_AGE_LIMIT, MODE_KG_LIMIT),
+            },
+            {
+                id = "CD",
+                label = string.format("Stage C + D  -  KG < %.2f & KG â‰¥ %.2f s/d Age 100", MODE_KG_LIMIT, MODE_KG_LIMIT),
+            },
+            {
+                id = "CAD",
+                label = string.format(
+                    "Stage C â†’ A â†’ D  -  Prioritas C (Age â‰¥ %.0f & KG < %.2f), lalu A (cari mutasi), lalu D (KG â‰¥ %.2f s/d Age 100)",
+                    MODE_AGE_LIMIT, MODE_KG_LIMIT, MODE_KG_LIMIT
+                ),
+            },
+        }
+    end
+
+    local function getModeButtonText()
+        return "Mode: " .. tostring(getEffectiveModeId())
+    end
+    
+    
+
+ -- ==================================================
+-- FOOTER AUTO KG (FULL)
+-- ==================================================
+local function refreshFooter()
+    local running = isAutoKGRunning()
+    local MODE_OPTIONS = getModeOptionsDynamic()
+
+    ui:SetFooterButtonsFor("autokg", {
+
+        -- MODE PICKER
+        {
+            text  = getModeButtonText(),
+            kind  = "normal",
+            order = 3,
+            onClick = function()
+                ui:OpenModePicker(MODE_OPTIONS, getEffectiveModeId(), function(newId)
+                    if type(setGBXPStageMode) == "function" then
+                        setGBXPStageMode(newId)
+                    else
+                        GBXP_STAGE_MODE = newId
+                    end
+
+                    autoSave()
+                    _G.__AUTOKG_DIRTY = true
+                    refreshFooter()
+                end)
+            end,
+        },
+
+        -- START KG
+        {
+            key     = "autokg_start",
+            text    = running and "âš¡ RUNNING." or "âš¡ START KG",
+            kind    = "normal",
+            running = running,
+            order   = 1,
+
+            onClick = function()
+                -- âœ… user klik START = buka manual-stop lock
+                _G.__AUTOKG_MANUAL_STOP = false
+                -- âœ… kalau sebelumnya ada autostart inflight (PSReconnect/qtp), lepas
+                _G.__AUTOKG_AUTOSTART_INFLIGHT = false
+
+                -- âœ… jangan double-start kalau sudah running
+                if isAutoKGRunning() then
+                    _G.__AUTOKG_DIRTY = true
+                    refreshFooter()
+                    return
+                end
+
+                local modeId = getEffectiveModeId()
+
+                -- simpan mode + reset stage biar konsisten
+                if type(setGBXPStageMode) == "function" then
+                    setGBXPStageMode(modeId)
+                else
+                    GBXP_STAGE_MODE = modeId
+                end
+
+                -- start loop
+                local loop = rawget(_G, "AutoKGLoop")
+                if loop and type(loop.Start) == "function" then
+                    pcall(function()
+                        loop.Start(modeId)
+                    end)
+                end
+
+                autoSave()
+                _G.__AUTOKG_DIRTY = true
+                refreshFooter()
+            end,
+
+            onReady = function(btn)
+                -- biar kerasa â€œelectricâ€
+                if isAutoKGRunning() then
+                    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+                    btn.TextColor3       = Color3.fromRGB(255, 217, 0)
+                else
+                    btn.BackgroundColor3 = COLOR_PANEL
+                    btn.TextColor3       = COLOR_WHITE
+                end
+            end,
+        },
+
+        -- STOP
+        {
+            text  = "STOP",
+            kind  = "normal",
+            order = 2,
+
+            onClick = function()
+                -- âœ… user klik STOP = kunci supaya autostart (PSReconnect/qtp/main) gak nyalain lagi
+                _G.__AUTOKG_MANUAL_STOP = true
+
+                local loop = rawget(_G, "AutoKGLoop")
+                if loop and type(loop.Stop) == "function" then
+                    pcall(function()
+                        loop.Stop("manual")
+                    end)
+                end
+
+                autoSave()
+                _G.__AUTOKG_DIRTY = true
+                refreshFooter()
+            end,
+        },
+
+    })
+end
+
+-- initial build
+refreshFooter()
+
+-- watcher 1: fast dirty signal
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        if _G.__AUTOKG_DIRTY then
+            _G.__AUTOKG_DIRTY = false
+            pcall(refreshFooter)
+        end
+    end
+end)
+
+-- watcher 2: polling running/mode changes
+task.spawn(function()
+    local lastRunning, lastMode = nil, nil
+    while true do
+        task.wait(1.5)
+
+        local nowRunning = isAutoKGRunning()
+        local nowMode    = getEffectiveModeId()
+
+        if nowRunning ~= lastRunning or nowMode ~= lastMode or _G.__AUTOKG_DIRTY then
+            _G.__AUTOKG_DIRTY = false
+            lastRunning, lastMode = nowRunning, nowMode
+            pcall(refreshFooter)
+        end
+    end
+end)
+
+
+    ----------------------------------------------------------------
+    -- AUTO SYNC LOOP (summary + gbxp reconcile + list refresh)
+    ----------------------------------------------------------------
+    if STATE._autokgSyncStarted ~= true then
+        STATE._autokgSyncStarted = true
+
+        task.spawn(function()
+            while true do
+                -- 1) reconcile gbxp candidates (auto select)
+                reconcileGBXP()
+
+                -- 2) summary global selalu update (aman, ringan)
+                refreshAllSummary()
+                
+                if _G.__AUTOKG_DIRTY then
+    _G.__AUTOKG_DIRTY = false
+    refreshAllSummary()
+    refreshTabList("noos")
+    refreshTabList("boost")
+    refreshTabList("seratusage")
+    refreshTabList("xp")
+    refreshTabList("gbxp")
+end
+
+
+                -- 3) optional: refresh list tab lain yang sedang kebuka
+                -- (kalau tab belum pernah dibuka, UIREF.tabs[tabKey] belum ada â†’ aman)
+                -- refreshTabList("noos")
+                -- refreshTabList("boost")
+                -- refreshTabList("seratusage")
+                -- refreshTabList("xp")
+                -- gbxp sudah di-refresh saat reconcile berubah
+
+                task.wait(4)
+            end
+        end)
+    end
+end
+
+return M
